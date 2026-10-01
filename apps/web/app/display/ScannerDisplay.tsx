@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownOutlined, ArrowUpOutlined, CheckCircleFilled, InboxOutlined, LoadingOutlined, ScanOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, App, Button, Card, Form, Input, InputNumber, Result, Segmented, Space, type InputRef } from "antd";
+import { Alert, App, Button, Card, Form, Input, InputNumber, Result, Segmented, type InputRef } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
@@ -36,9 +36,10 @@ export default function ScannerDisplay() {
 
   function focusQuantity(): void {
     window.setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>("#display-quantity input, #display-quantity");
-      input?.focus();
-      input?.select();
+      const input = document.querySelector<HTMLInputElement>("input#display-quantity");
+      if (!input) return;
+      input.focus();
+      input.select();
     }, 40);
   }
 
@@ -129,7 +130,7 @@ export default function ScannerDisplay() {
 
             <div className={styles.entryGrid}>
               <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: "Enter quantity" }, { validator: async (_, value) => { if (direction === "OUT" && selectedItem && Number(value) > Number(selectedItem.CurrentBalance)) throw new Error("Quantity exceeds current balance"); } }]}>
-                <Space.Compact block size="large" id="display-quantity"><InputNumber className="w-full" min={0.01} max={direction === "OUT" && selectedItem ? Number(selectedItem.CurrentBalance) : Number.MAX_SAFE_INTEGER} precision={2} step={1} prefix={<InboxOutlined />} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); operatorInput.current?.focus({ cursor: "all" }); }} /><Space.Addon>{selectedItem?.Unit ?? "Unit"}</Space.Addon></Space.Compact>
+                <InputNumber id="display-quantity" className="w-full" suffix={selectedItem?.Unit ?? "Unit"} min={0.01} max={direction === "OUT" && selectedItem ? Number(selectedItem.CurrentBalance) : Number.MAX_SAFE_INTEGER} precision={2} step={1} prefix={<InboxOutlined />} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); operatorInput.current?.focus({ cursor: "all" }); }} />
               </Form.Item>
               <Form.Item name="operatorName" label="Operator Name" rules={[{ required: true, whitespace: true, message: "Enter operator name" }, { pattern: /^[\p{L}\p{N} .'-]{2,80}$/u, message: "Enter a valid operator name" }]}>
                 <Input ref={operatorInput} allowClear prefix={<UserOutlined />} suffix={<span className={styles.enterHint}>Enter to submit ↵</span>} placeholder="Type operator name" maxLength={80} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); form.submit(); }} />
