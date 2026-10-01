@@ -165,8 +165,12 @@
   }
 
   .entryGrid {
-    grid-template-columns: minmax(240px, 0.72fr) minmax(360px, 1.28fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 24px !important;
+  }
+
+  .entryGrid :global(.ant-input-number) {
+    width: 100% !important;
   }
 
   .submitButton {

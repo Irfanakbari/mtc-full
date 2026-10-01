@@ -6,6 +6,13 @@ import type { CurrentUserIdentity } from '../auth/current-user.interface';
 import { claimCommand, finishCommand } from '../common/business-command';
 import { lockInventoryItem, withSerializableInventory, type TransactionClient } from '../common/inventory-transaction';
 import { LedgerQueryDto, StockMutationDto } from './dto';
+import { getDisplayNotes, getDisplayOperator } from './ledger-presentation';
+
+const OPERATIONAL_TRANSACTION_TYPES: InventoryTransactionType[] = [
+  InventoryTransactionType.STOCK_IN,
+  InventoryTransactionType.STOCK_OUT,
+  InventoryTransactionType.SCRAP,
+];
 
 @Injectable()
 export class StockTransactionsService {
@@ -35,11 +42,20 @@ export class StockTransactionsService {
     });
   }
 
-  async list(query: LedgerQueryDto) {
+  listTransactions(query: LedgerQueryDto) {
+    return this.list(query, OPERATIONAL_TRANSACTION_TYPES);
+  }
+
+
+  async list(query: LedgerQueryDto, allowedTypes?: InventoryTransactionType[]) {
     const where: Prisma.InventoryLedgerWhereInput = {};
     if (query.itemId) where.ItemId = query.itemId;
     if (query.address) where.Item = { AddressLocation: { contains: query.address, mode: 'insensitive' } };
-    if (query.transactionType) where.TransactionType = query.transactionType;
+    if (allowedTypes) {
+      where.TransactionType = query.transactionType && allowedTypes.includes(query.transactionType)
+        ? query.transactionType
+        : { in: query.transactionType ? [] : allowedTypes };
+    } else if (query.transactionType) where.TransactionType = query.transactionType;
     if (query.actor) where.CreatedBy = { contains: query.actor, mode: 'insensitive' };
     if (query.search) where.OR = [{ ReferenceDoc: { contains: query.search, mode: 'insensitive' } }, { Item: { ItemCode: { contains: query.search, mode: 'insensitive' } } }, { Item: { Name: { contains: query.search, mode: 'insensitive' } } }];
     if (query.from || query.to) where.TransactionDate = { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) };
@@ -47,13 +63,13 @@ export class StockTransactionsService {
       this.prisma.inventoryLedger.count({ where }),
       this.prisma.inventoryLedger.findMany({ where, include: { Item: { select: { ItemCode: true, Name: true, AddressLocation: true, Unit: true } } }, orderBy: [{ TransactionDate: 'desc' }, { Id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }),
     ]);
-    return { data, meta: { page: query.page, limit: query.limit, totalItems: total, totalPages: Math.ceil(total / query.limit) } };
+    return { data: await this.withActorDisplayNames(data), meta: { page: query.page, limit: query.limit, totalItems: total, totalPages: Math.ceil(total / query.limit) } };
   }
 
   async detail(id: string) {
     const ledger = await this.prisma.inventoryLedger.findUnique({ where: { Id: id }, include: { Item: true, ReversalOf: true, ReversedBy: true } });
     if (!ledger) throw new NotFoundException('Ledger entry not found');
-    return ledger;
+    return (await this.withActorDisplayNames([ledger]))[0];
   }
 
   async reconcile(itemId?: string) {
@@ -66,6 +82,29 @@ export class StockTransactionsService {
     }
     return result;
   }
+
+  private async withActorDisplayNames<T extends { CreatedBy: string; Notes: string | null }>(rows: T[]) {
+    if (rows.length === 0) return [];
+    const ssoIds = [...new Set(rows.map((row) => row.CreatedBy).filter((actor) => !actor.startsWith('api-key:')))];
+    const apiKeyIds = [...new Set(rows.map((row) => row.CreatedBy).filter((actor) => actor.startsWith('api-key:')).map((actor) => actor.slice('api-key:'.length)))];
+    const [users, apiKeys] = await Promise.all([
+      ssoIds.length ? this.prisma.appUser.findMany({ where: { SsoObjectId: { in: ssoIds } }, select: { SsoObjectId: true, Name: true } }) : [],
+      apiKeyIds.length ? this.prisma.apiKey.findMany({ where: { Id: { in: apiKeyIds } }, select: { Id: true, Name: true } }) : [],
+    ]);
+    const userNames = new Map<string, string>(users.map((user) => [user.SsoObjectId, user.Name] as const));
+    const apiKeyNames = new Map<string, string>(apiKeys.map((apiKey) => [apiKey.Id, apiKey.Name] as const));
+
+    return rows.map((row) => {
+      const displayOperator = getDisplayOperator(row.Notes);
+      const apiKeyId = row.CreatedBy.startsWith('api-key:') ? row.CreatedBy.slice('api-key:'.length) : null;
+      const actorDisplayName = displayOperator
+        ?? userNames.get(row.CreatedBy)
+        ?? (apiKeyId ? apiKeyNames.get(apiKeyId) : undefined)
+        ?? (row.CreatedBy === 'system:seed' ? 'System Seed' : row.CreatedBy);
+      return { ...row, ActorDisplayName: actorDisplayName, Notes: getDisplayNotes(row.Notes) };
+    });
+  }
+
 
   private async assertNotFrozen(tx: TransactionClient, itemId: string): Promise<void> {
     const active = await tx.stockOpnameDetail.findFirst({ where: { ItemId: itemId, Opname: { Status: OpnameStatus.IN_PROGRESS } }, select: { Opname: { select: { RecordNumber: true } } } });

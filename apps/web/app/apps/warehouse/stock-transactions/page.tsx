@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StockLedgerTable } from "@/components/StockLedgerTable";
 import ToolbarWrapper from "@/components/ToolbarWrapper";
 import { fetchItems } from "@/store/features/itemsSlice";
-import { fetchLedger, mutateStock } from "@/store/features/stockSlice";
+import { fetchTransactions, mutateStock } from "@/store/features/stockSlice";
 import type { AppDispatch, RootState } from "@/store/store";
 type Mode = "in" | "out" | "scrap";
 type Values = {
@@ -50,7 +50,7 @@ export default function TransactionsPage() {
       message.success(`Stock ${mode.toUpperCase()} recorded successfully`);
       setMode(null);
       form.resetFields();
-      void dispatch(fetchLedger(stock.query));
+      void dispatch(fetchTransactions(stock.query));
     } catch (e) {
       if ((e as { errorFields?: unknown }).errorFields) return;
       message.error(e instanceof Error ? e.message : String(e));
@@ -67,7 +67,7 @@ export default function TransactionsPage() {
         <ButtonToolbar
           title="Refresh"
           icon={<ReloadOutlined />}
-          onClick={() => void dispatch(fetchLedger(stock.query))}
+          onClick={() => void dispatch(fetchTransactions(stock.query))}
         />
         <ButtonToolbar
           title="Stock In"
@@ -89,7 +89,7 @@ export default function TransactionsPage() {
         />
       </ToolbarWrapper>
       <Card variant="borderless" styles={{ body: { padding: 0 } }}>
-        <StockLedgerTable />
+        <StockLedgerTable mode="transactions" />
       </Card>
       <Modal
         title={mode ? `Record Stock ${mode.toUpperCase()}` : ""}
