@@ -1,0 +1,279 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum InventoryTransactionType {
+  OPENING_BALANCE
+  STOCK_IN
+  STOCK_OUT
+  SCRAP
+  STOCK_OPNAME_DIFF
+  REVERSAL
+}
+
+enum OpnameScope {
+  SELECTED_ITEMS
+  ALL_ACTIVE_ITEMS
+}
+
+enum OpnameStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProcessStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model InventoryItem {
+  Id                String   @id @default(uuid())
+  ItemCode          String   @unique @db.VarChar(80)
+  Name              String   @db.VarChar(200)
+  Brand             String?  @db.VarChar(120)
+  Model             String?  @db.VarChar(120)
+  SerialNumber      String?  @db.VarChar(160)
+  Unit              String   @default("PCS") @db.VarChar(30)
+  AddressLocation   String   @unique @db.VarChar(120)
+  CurrentBalance    Decimal  @default(0) @db.Decimal(18, 2)
+  MinimumStock      Decimal  @default(0) @db.Decimal(18, 2)
+  IsActive          Boolean  @default(true)
+  DiscontinuedAt    DateTime?
+  DiscontinueReason String?  @db.VarChar(500)
+  CreatedAt         DateTime @default(now())
+  CreatedBy         String   @db.VarChar(160)
+  UpdatedAt         DateTime @updatedAt
+  UpdatedBy         String?  @db.VarChar(160)
+
+  LedgerEntries     InventoryLedger[]
+  OpnameDetails     StockOpnameDetail[]
+  OpnameSelections  StockOpnameSelection[]
+
+  @@index([Name])
+  @@index([IsActive])
+  @@index([AddressLocation])
+}
+
+model InventoryLedger {
+  Id               String                   @id @default(uuid())
+  ItemId           String
+  TransactionDate  DateTime                 @default(now())
+  TransactionType  InventoryTransactionType
+  ReferenceDoc     String                   @db.VarChar(160)
+  BalanceBefore    Decimal                  @db.Decimal(18, 2)
+  QtyIn            Decimal                  @default(0) @db.Decimal(18, 2)
+  QtyOut           Decimal                  @default(0) @db.Decimal(18, 2)
+  BalanceAfter     Decimal                  @db.Decimal(18, 2)
+  CreatedBy        String                   @db.VarChar(160)
+  Notes            String?                  @db.VarChar(1000)
+  IdempotencyKey   String?                  @db.VarChar(80)
+  ReversalOfId     String?                  @unique
+
+  Item             InventoryItem            @relation(fields: [ItemId], references: [Id], onDelete: Restrict)
+  ReversalOf       InventoryLedger?          @relation("LedgerReversal", fields: [ReversalOfId], references: [Id], onDelete: Restrict)
+  ReversedBy       InventoryLedger?          @relation("LedgerReversal")
+
+  @@index([ItemId, TransactionDate])
+  @@index([TransactionType, TransactionDate])
+  @@index([ReferenceDoc])
+  @@unique([ItemId, IdempotencyKey])
+}
+
+model BusinessCommand {
+  Id          String   @id @default(uuid())
+  Operation   String   @db.VarChar(100)
+  CommandKey  String   @db.VarChar(80)
+  RequestHash String   @db.VarChar(64)
+  Actor       String   @db.VarChar(160)
+  Result      Json?
+  CreatedAt   DateTime @default(now())
+  CompletedAt DateTime?
+
+  @@unique([Operation, CommandKey])
+  @@index([CreatedAt])
+}
+
+model StockOpname {
+  Id             String       @id @default(uuid())
+  RecordNumber   String       @unique @db.VarChar(40)
+  Scope          OpnameScope
+  Status         OpnameStatus @default(DRAFT)
+  Notes          String?      @db.VarChar(1000)
+  CreatedAt      DateTime     @default(now())
+  CreatedBy      String       @db.VarChar(160)
+  StartedAt      DateTime?
+  StartedBy      String?      @db.VarChar(160)
+  CompletedAt    DateTime?
+  CompletedBy    String?      @db.VarChar(160)
+  ApprovalNotes  String?      @db.VarChar(1000)
+
+  Selections     StockOpnameSelection[]
+  Details        StockOpnameDetail[]
+  Attachments    StockOpnameAttachment[]
+
+  @@index([Status, CreatedAt])
+}
+
+model StockOpnameSelection {
+  Id       Int    @id @default(autoincrement())
+  OpnameId String
+  ItemId   String
+
+  Opname   StockOpname   @relation(fields: [OpnameId], references: [Id], onDelete: Cascade)
+  Item     InventoryItem @relation(fields: [ItemId], references: [Id], onDelete: Restrict)
+
+  @@unique([OpnameId, ItemId])
+  @@index([ItemId])
+}
+
+model StockOpnameDetail {
+  Id             Int      @id @default(autoincrement())
+  OpnameId       String
+  ItemId         String
+  SystemQty      Decimal  @db.Decimal(18, 2)
+  ActualQty      Decimal? @db.Decimal(18, 2)
+  DifferenceQty  Decimal? @db.Decimal(18, 2)
+  CountedAt      DateTime?
+  CountedBy      String?  @db.VarChar(160)
+  Notes          String?  @db.VarChar(1000)
+
+  Opname         StockOpname   @relation(fields: [OpnameId], references: [Id], onDelete: Cascade)
+  Item           InventoryItem @relation(fields: [ItemId], references: [Id], onDelete: Restrict)
+
+  @@unique([OpnameId, ItemId])
+  @@index([ItemId])
+}
+
+model StockOpnameAttachment {
+  Id               Int      @id @default(autoincrement())
+  OpnameId         String
+  StoredName       String   @db.VarChar(255)
+  OriginalName     String   @db.VarChar(255)
+  RelativePath     String   @db.VarChar(500)
+  MimeType         String   @db.VarChar(120)
+  Size             Int
+  CreatedAt        DateTime @default(now())
+  CreatedBy        String   @db.VarChar(160)
+
+  Opname           StockOpname @relation(fields: [OpnameId], references: [Id], onDelete: Cascade)
+
+  @@index([OpnameId])
+}
+
+model RecordNumberCounter {
+  Id           String   @id @default(uuid())
+  Prefix       String   @db.VarChar(20)
+  BusinessDate DateTime @db.Date
+  LastSequence Int
+  CreatedAt    DateTime @default(now())
+  UpdatedAt    DateTime @updatedAt
+
+  @@unique([Prefix, BusinessDate])
+}
+
+model AppUser {
+  Id          String    @id @default(uuid())
+  SsoObjectId String    @unique @db.VarChar(160)
+  Email       String    @unique @db.VarChar(255)
+  Name        String    @db.VarChar(255)
+  IsActive    Boolean   @default(true)
+  RoleId      String?
+  LastLogin   DateTime?
+  CreatedAt   DateTime  @default(now())
+  CreatedBy   String    @db.VarChar(160)
+  UpdatedAt   DateTime  @updatedAt
+  UpdatedBy   String?   @db.VarChar(160)
+
+  Role        AppRole?  @relation(fields: [RoleId], references: [Id], onDelete: SetNull)
+
+  @@index([RoleId])
+}
+
+model AppRole {
+  Id          String          @id @default(uuid())
+  Name        String          @unique @db.VarChar(100)
+  Description String?         @db.VarChar(500)
+  IsSystem    Boolean         @default(false)
+  CreatedAt   DateTime        @default(now())
+  CreatedBy   String          @db.VarChar(160)
+  UpdatedAt   DateTime        @updatedAt
+  UpdatedBy   String?         @db.VarChar(160)
+
+  Users       AppUser[]
+  Permissions AppPermission[]
+}
+
+model AppPermission {
+  Id          String    @id @default(uuid())
+  Action      String    @unique @db.VarChar(120)
+  Description String?   @db.VarChar(500)
+  Roles       AppRole[]
+}
+
+model ApiKey {
+  Id          String    @id @default(uuid())
+  Name        String    @db.VarChar(120)
+  Prefix      String    @unique @db.VarChar(20)
+  SecretHash  String    @db.VarChar(255)
+  IsActive    Boolean   @default(true)
+  ExpiresAt   DateTime?
+  LastUsedAt  DateTime?
+  CreatedAt   DateTime  @default(now())
+  CreatedBy   String    @db.VarChar(160)
+  RevokedAt   DateTime?
+  RevokedBy   String?   @db.VarChar(160)
+  Permissions String[]
+}
+
+model ProcessLog {
+  Id           String        @id @default(uuid())
+  FunctionId   String        @db.VarChar(100)
+  FunctionName String        @db.VarChar(200)
+  Status       ProcessStatus @default(RUNNING)
+  Actor        String?       @db.VarChar(160)
+  RequestId    String?       @db.VarChar(128)
+  StartedAt    DateTime      @default(now())
+  CompletedAt  DateTime?
+  Summary      String?       @db.VarChar(1000)
+
+  Details      ProcessLogDetail[]
+
+  @@index([StartedAt])
+  @@index([Status])
+}
+
+model ProcessLogDetail {
+  Id        BigInt   @id @default(autoincrement())
+  ProcessId String
+  Level     String   @db.VarChar(20)
+  Message   String   @db.VarChar(2000)
+  CreatedAt DateTime @default(now())
+
+  Process   ProcessLog @relation(fields: [ProcessId], references: [Id], onDelete: Cascade)
+
+  @@index([ProcessId, CreatedAt])
+}
+
+model ActionAuditEvent {
+  Id         BigInt   @id @default(autoincrement())
+  EntityType String   @db.VarChar(100)
+  EntityId   String   @db.VarChar(160)
+  Action     String   @db.VarChar(60)
+  Actor      String   @db.VarChar(160)
+  RequestId  String?  @db.VarChar(128)
+  Before     Json?
+  After      Json?
+  CreatedAt  DateTime @default(now())
+
+  @@index([EntityType, EntityId])
+  @@index([CreatedAt])
+}

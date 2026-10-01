@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mtc}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - mtc_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
+    volumes:
+      - mtc_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  api:
+    build: { context: ., dockerfile: Dockerfile.api }
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mtc}
+      PORT: 31000
+      NODE_ENV: production
+      VUTEQ_SSO_ENABLED: "true"
+      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
+      VUTEQ_SSO_SECRET: ${VUTEQ_SSO_SECRET:?Set VUTEQ_SSO_SECRET in .env}
+      VUTEQ_SSO_ALLOWED_CLIENT_IDS: ${VUTEQ_SSO_ALLOWED_CLIENT_IDS:-mtc-web}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      SWAGGER_API_KEY: ${SWAGGER_API_KEY:-}
+      STORAGE_PATH: /app/storage
+    volumes:
+      - mtc_documents:/app/storage
+    ports: ["31000:31000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        API_URL: http://api:31000
+        VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
+        VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:-http://localhost:31001}
+    environment:
+      API_URL: http://api:31000
+      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
+      VUTEQ_SSO_SECRET: ${VUTEQ_SSO_SECRET:?Set VUTEQ_SSO_SECRET in .env}
+      VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:-http://localhost:31001}
+      VUTEQ_SSO_TRUST_PROXY: ${VUTEQ_SSO_TRUST_PROXY:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      VUTEQ_SSO_REDIS_DB: 0
+      VUTEQ_SSO_REDIS_KEY_PREFIX: "mtc:sso:"
+    ports: ["31001:31001"]
+    depends_on:
+      api: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+volumes:
+  mtc_postgres:
+  mtc_redis:
+  mtc_documents:

@@ -1,0 +1,5 @@
+import { toClientSession } from '@vuteq/sso-client-react';
+import { getApiUrl } from '@/lib/config';
+import { sso } from '@/lib/sso';
+export const dynamic = 'force-dynamic';
+export async function GET(request: Request) { const session = await sso.session(request); if (!session) { const headers = new Headers({ 'Cache-Control': 'no-store' }); headers.append('Set-Cookie', '__Host-mtc_sso=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'); headers.append('Set-Cookie', 'mtc_sso=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'); return Response.json(null, { headers }); } const response = await sso.fetch(request, `${getApiUrl()}/auth/profile`, { cache: 'no-store' }); let profile: { RoleName?: string | null; Permission?: string[] } | null = null; if (response.ok) { const payload = await response.json().catch(() => null) as { data?: { RoleName?: string | null; Permission?: string[] } } | null; profile = payload?.data ?? null; } return Response.json(toClientSession(session, { roles: profile?.RoleName ? [profile.RoleName] : [], permissions: profile?.Permission ?? [] }), { headers: { 'Cache-Control': 'no-store' } }); }

@@ -1,0 +1,23 @@
+.batik-bg {
+  background-color: #263545 !important;
+  background-image: url("/images/batik5.png") !important;
+  background-size: 1000px !important;
+  background-repeat: repeat !important;
+  background-position: center !important;
+  color: #ffffff !important;
+  position: relative !important;
+}
+
+.batik-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(38, 53, 69, 0.72);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.batik-bg > * {
+  position: relative;
+  z-index: 1;
+}

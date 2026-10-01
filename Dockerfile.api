@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+FROM node:22-bookworm AS builder
+WORKDIR /workspace
+RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY vendor vendor
+RUN pnpm install --frozen-lockfile
+RUN mkdir -p /runtime/apps/api /runtime/vendor \
+    && cp package.json pnpm-lock.yaml pnpm-workspace.yaml /runtime/ \
+    && cp apps/api/package.json /runtime/apps/api/package.json \
+    && cp vendor/* /runtime/vendor/ \
+    && cd /runtime && pnpm install --prod --frozen-lockfile --filter @mtc/api...
+COPY apps/api apps/api
+RUN cd apps/api && DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm exec prisma generate && pnpm run build
+
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production PORT=31000 STORAGE_PATH=/app/storage
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder --chown=node:node /runtime/node_modules ./node_modules
+COPY --from=builder --chown=node:node /runtime/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder --chown=node:node /workspace/apps/api/package.json ./apps/api/package.json
+COPY --from=builder --chown=node:node /workspace/apps/api/dist ./apps/api/dist
+COPY --from=builder --chown=node:node /workspace/apps/api/prisma ./apps/api/prisma
+COPY --from=builder --chown=node:node /workspace/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
+RUN mkdir -p /app/storage/inventory-counting && chown -R node:node /app/storage
+USER node
+EXPOSE 31000
+VOLUME ["/app/storage"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:31000/v1/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+CMD ["sh", "-c", "cd /app/apps/api && node node_modules/prisma/build/index.js migrate deploy && node dist/src/main.js"]

@@ -1,0 +1,22 @@
+{
+  "name": "mtc-inventory-system",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @mtc/web dev",
+    "dev:api": "pnpm --filter @mtc/api start:dev",
+    "build": "pnpm -r --if-present run build",
+    "build:web": "pnpm --filter @mtc/web build",
+    "build:api": "pnpm --filter @mtc/api build",
+    "lint": "pnpm -r --if-present run lint",
+    "lint:web": "pnpm --filter @mtc/web lint",
+    "lint:api": "pnpm --filter @mtc/api lint",
+    "test": "pnpm --filter @mtc/api exec jest --runInBand",
+    "test:e2e": "pnpm --filter @mtc/api test:e2e",
+    "prisma:validate": "pnpm --filter @mtc/api exec prisma validate",
+    "prisma:generate": "pnpm --filter @mtc/api exec prisma generate",
+    "db:migrate": "pnpm --filter @mtc/api exec prisma migrate deploy",
+    "db:seed": "pnpm --filter @mtc/api db:seed"
+  }
+}
