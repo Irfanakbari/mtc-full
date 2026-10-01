@@ -10,6 +10,19 @@ Requirements: Node.js 22, pnpm 10, PostgreSQL 16, Redis 7, and a registered conf
 4. Start the API with `pnpm dev:api` and web with `pnpm dev:web`.
 5. Verify `GET http://localhost:31000/v1/health/live` and open `http://localhost:31001`.
 
+## Operator display
+
+`/display` is a public kiosk page for Stock In and Stock Out. It does not require an SSO session. Its BFF routes authenticate to the API with a server-only, least-privilege key.
+
+1. Generate a strong value beginning with `mtc_` and containing at least 32 characters in total.
+2. Set the same `MTC_DISPLAY_API_KEY` in the API/seeder and web server environments. Never expose it through a `NEXT_PUBLIC_` variable.
+3. Run `pnpm db:seed`. The seeder creates or rotates `MTC Operator Display` with only `MTC.ITEM.READ`, `MTC.STOCK.IN`, and `MTC.STOCK.OUT`.
+4. Restart the web service, open `/display`, and verify item search plus one controlled Stock In/Out transaction.
+
+The BFF requires same-origin mutation requests, applies a per-process request limit, accepts only the two stock operations, validates all fields, and records the entered operator name in ledger notes. For production, expose only the web service and restrict `/display` to the warehouse network at the reverse proxy when possible.
+
+For local development only, if `MTC_DISPLAY_API_KEY` is absent, `pnpm db:seed` generates a strong key in ignored file `apps/api/.env.display`. The development BFF reads that file server-side. Production always requires the explicit environment variable.
+
 The bootstrap administrator email is applied only when that SSO identity is first provisioned. Clear the variable after initial role assignment.
 
 ## Production with Compose

@@ -1,7 +1,12 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
+const queryBoolean = ({ value }: { value: unknown }) => {
+  if (value === 'true' || value === true) return true;
+  if (value === 'false' || value === false) return false;
+  return value;
+};
 
 export class CreateInventoryItemDto {
   @Transform(trim) @IsString() @Length(1, 80) itemCode!: string;
@@ -29,11 +34,11 @@ export class UpdateInventoryItemDto {
 }
 
 export class ItemQueryDto {
-  @IsOptional() @IsNumber() @Min(1) page = 1;
-  @IsOptional() @IsNumber() @Min(1) @Max(200) limit = 50;
+  @Type(() => Number) @IsOptional() @IsNumber() @Min(1) page: number = 1;
+  @Type(() => Number) @IsOptional() @IsNumber() @Min(1) @Max(200) limit: number = 50;
   @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsBoolean() active?: boolean;
-  @IsOptional() @IsBoolean() lowStock?: boolean;
+  @Transform(queryBoolean) @IsOptional() @IsBoolean() active?: boolean;
+  @Transform(queryBoolean) @IsOptional() @IsBoolean() lowStock?: boolean;
   @IsOptional() @IsString() address?: string;
   @IsOptional() @IsIn(['ItemCode', 'Name', 'AddressLocation', 'CurrentBalance', 'CreatedAt']) sortBy = 'ItemCode';
   @IsOptional() @IsIn(['asc', 'desc']) sortOrder: 'asc' | 'desc' = 'asc';

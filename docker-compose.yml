@@ -38,6 +38,7 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       SWAGGER_API_KEY: ${SWAGGER_API_KEY:-}
       STORAGE_PATH: /app/storage
+      MTC_DISPLAY_API_KEY: ${MTC_DISPLAY_API_KEY:?Set MTC_DISPLAY_API_KEY in .env}
     volumes:
       - mtc_documents:/app/storage
     ports: ["31000:31000"]
@@ -63,6 +64,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       VUTEQ_SSO_REDIS_DB: 0
       VUTEQ_SSO_REDIS_KEY_PREFIX: "mtc:sso:"
+      MTC_DISPLAY_API_KEY: ${MTC_DISPLAY_API_KEY:?Set MTC_DISPLAY_API_KEY in .env}
     ports: ["31001:31001"]
     depends_on:
       api: { condition: service_healthy }

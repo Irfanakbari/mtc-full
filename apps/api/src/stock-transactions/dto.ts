@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { InventoryTransactionType } from '../generated/prisma/enums';
 
@@ -9,8 +10,8 @@ export class StockMutationDto {
 }
 
 export class LedgerQueryDto {
-  @IsOptional() @IsNumber() @Min(1) page = 1;
-  @IsOptional() @IsNumber() @Min(1) @Max(200) limit = 50;
+  @Type(() => Number) @IsOptional() @IsNumber() @Min(1) page: number = 1;
+  @Type(() => Number) @IsOptional() @IsNumber() @Min(1) @Max(200) limit: number = 50;
   @IsOptional() @IsUUID() itemId?: string;
   @IsOptional() @IsString() address?: string;
   @IsOptional() @IsString() search?: string;
