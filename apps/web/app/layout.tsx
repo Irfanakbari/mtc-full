@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { App, ConfigProvider } from "antd";
 import { VuteqSsoProvider } from "@vuteq/sso-client-react/react";
+import { withBasePath } from "@/lib/base-path";
 import { ReduxProvider } from "@/store/provider";
 import "./globals.css";
 
@@ -14,7 +15,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className="antialiased">
-        <VuteqSsoProvider sessionEndpoint="/api/auth/session" loginPath="/auth/login" logoutPath="/auth/logout">
+        <VuteqSsoProvider
+          sessionEndpoint={withBasePath("/api/auth/session")}
+          loginPath={withBasePath("/auth/login")}
+          logoutPath={withBasePath("/auth/logout")}
+        >
           <ReduxProvider>
             <ConfigProvider
               theme={{

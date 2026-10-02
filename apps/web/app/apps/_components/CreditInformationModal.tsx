@@ -7,6 +7,7 @@ import {
 import { Button, Modal } from "antd";
 import Image from "next/image";
 import { useState } from "react";
+import { withBasePath } from "@/lib/base-path";
 
 type CreditInformationModalProps = {
   open: boolean;
@@ -139,8 +140,8 @@ export default function CreditInformationModal({
         <div className="mtc-security-stack">
           <div className="mtc-credit-eyebrow">Security Powered by</div>
           <div className="mtc-security-badges">
-            <Image src="/images/ssl.png" alt="SSL Secured" width={120} height={30} style={{ objectFit: "contain" }} />
-            <Image src="/images/aes.webp" alt="AES 256 Encryption" width={60} height={60} style={{ objectFit: "contain" }} />
+            <Image src={withBasePath("/images/ssl.png")} alt="SSL Secured" width={120} height={30} style={{ objectFit: "contain" }} />
+            <Image src={withBasePath("/images/aes.webp")} alt="AES 256 Encryption" width={60} height={60} style={{ objectFit: "contain" }} />
           </div>
         </div>
       </Modal>

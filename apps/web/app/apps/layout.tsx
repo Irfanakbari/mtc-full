@@ -31,6 +31,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { withBasePath, withoutBasePath } from "@/lib/base-path";
 import CreditInformationModal from "./_components/CreditInformationModal";
 import PrivacyPolicyModal from "./_components/PrivacyPolicyModal";
 import UpdateLogModal from "./_components/UpdateLogModal";
@@ -105,7 +106,7 @@ function Brand({ collapsed = false }: { collapsed?: boolean }) {
   if (collapsed) return <strong className="mtc-logo-collapsed">M</strong>;
   return (
     <div className="mtc-logo-lockup" aria-label="MTC Inventory System">
-      <Image src="/images/vtqw.png" alt="Vuteq" width={135} height={47} priority />
+      <Image src={withBasePath("/images/vtqw.png")} alt="Vuteq" width={135} height={47} priority />
       <span>MTC</span>
     </div>
   );
@@ -117,11 +118,11 @@ export default function AppsLayout({ children }: { children: React.ReactNode }) 
   const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
   const [updateLogOpen, setUpdateLogOpen] = useState(false);
   const { session, loading } = useVuteqSso();
-  const pathname = usePathname();
+  const pathname = withoutBasePath(usePathname());
   const { modal } = App.useApp();
 
   useEffect(() => {
-    if (!loading && !session) window.location.replace("/auth/login");
+    if (!loading && !session) window.location.replace(withBasePath("/auth/login"));
   }, [loading, session]);
 
   const permissions = useMemo(() => session?.permissions ?? [], [session?.permissions]);
@@ -146,7 +147,7 @@ export default function AppsLayout({ children }: { children: React.ReactNode }) 
       onOk: () => {
         const form = document.createElement("form");
         form.method = "POST";
-        form.action = "/auth/logout";
+        form.action = withBasePath("/auth/logout");
         document.body.appendChild(form);
         form.submit();
       },

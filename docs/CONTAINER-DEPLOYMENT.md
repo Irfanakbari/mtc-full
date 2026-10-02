@@ -1,6 +1,6 @@
 # MTC container deployment
 
-MTC uses one combined application image, `mtc-app`, for both the NestJS API and
+MTC uses one combined application image, `vuteq/mtc-app`, for both the NestJS API and
 the Next.js web application. This mirrors the ANSEI runtime model: the same image
 is started with a different service role.
 
@@ -11,7 +11,7 @@ docker build \
   --build-arg API_URL=http://api:31000 \
   --build-arg VUTEQ_SSO_BASE_URL=https://sso.vuteq.co.id \
   --build-arg VUTEQ_SSO_PUBLIC_ORIGIN=https://mtc.example.com \
-  -t mtc-app:local .
+  -t vuteq/mtc-app:local .
 ```
 
 The image supports these commands:
@@ -21,6 +21,11 @@ The image supports these commands:
 - `all`: starts both processes in one container. Production Compose should use
   separate API and web containers so each process has an independent health and
   restart lifecycle.
+
+The web application is built at `/mtc`. Its web health endpoint is
+`/mtc/api/health`, and the reverse proxy must forward `/mtc` and `/mtc/*`
+without stripping the prefix. Static assets and all browser-facing BFF routes
+use the same base path.
 
 ## Run with Compose
 
@@ -35,7 +40,7 @@ docker compose up -d --build
 To use an image already built or pulled by the deployment host:
 
 ```bash
-MTC_IMAGE=your-dockerhub-user/mtc-app:production docker compose up -d --no-build
+MTC_IMAGE=vuteq/mtc-app:production docker compose up -d --no-build
 ```
 
 Do not put SSO connection secrets, database credentials, API keys, or session
@@ -57,4 +62,6 @@ An automated Docker Hub publish job requires these GitHub Environment secrets:
 Required GitHub Environment variables or secrets are `API_URL`,
 `VUTEQ_SSO_BASE_URL`, and `VUTEQ_SSO_PUBLIC_ORIGIN`. Keep the `production` and
 `staging` values in their corresponding GitHub Environments. The workflow does
-not provide deployment URL fallbacks.
+not provide deployment URL fallbacks. `VUTEQ_SSO_PUBLIC_ORIGIN` is an origin,
+not a path; register the `/mtc/auth/callback`, `/mtc/`, and
+`/mtc/api/auth/backchannel-logout` URLs separately in Vuteq SSO.

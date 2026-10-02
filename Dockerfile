@@ -70,7 +70,7 @@ EXPOSE 31000
 EXPOSE 31001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["node", "-e", "const role=process.env.SERVICE_ROLE||'api';const port=process.env.PORT||(role==='web'?'31001':'31000');const path=role==='web'?'/api/health':'/v1/health/live';fetch('http://127.0.0.1:'+port+path).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+  CMD ["node", "-e", "const role=process.env.SERVICE_ROLE||'api';const port=process.env.PORT||(role==='web'?'31001':'31000');const path=role==='web'?'/mtc/api/health':'/v1/health/live';fetch('http://127.0.0.1:'+port+path).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["dumb-init", "--", "./start.sh"]
 CMD ["api"]

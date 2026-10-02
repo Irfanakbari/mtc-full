@@ -1,3 +1,5 @@
+import { withBasePath } from "@/lib/base-path";
+
 export interface ApiEnvelope<T> {
   success: true;
   statusCode: number;
@@ -34,7 +36,7 @@ async function request<T>(
   } = {},
 ): Promise<T> {
   const url = new URL(
-    `/api/proxy/v1${path.startsWith("/") ? path : `/${path}`}`,
+    withBasePath(`/api/proxy/v1${path.startsWith("/") ? path : `/${path}`}`),
     window.location.origin,
   );
   Object.entries(options.params ?? {}).forEach(([key, value]) => {
@@ -56,7 +58,7 @@ async function request<T>(
   if (response.status === 401) {
     // A hard navigation clears stale client state before starting SSO again.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.href = "/?sessionExpired=true";
+    window.location.href = `${withBasePath("/")}?sessionExpired=true`;
     throw new ApiError("Session expired", 401);
   }
   if (options.responseType === "blob" && response.ok)

@@ -9,6 +9,7 @@ coverage/
 .env
 .env.*
 !.env.example
+!deploy/.env.production.example
 storage/
 apps/api/src/generated/prisma/
 apps/api/generated/

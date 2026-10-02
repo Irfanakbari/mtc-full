@@ -1,6 +1,7 @@
 import { HistoryOutlined } from "@ant-design/icons";
 import { Button, Empty, Modal, Spin, Tag } from "antd";
 import { useCallback, useState } from "react";
+import { withBasePath } from "@/lib/base-path";
 
 type ProjectCommit = {
   hash: string;
@@ -42,7 +43,7 @@ export default function UpdateLogModal({ open, onClose, appVersion }: UpdateLogM
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/data/project-commit-history.json", { cache: "no-store" });
+      const response = await fetch(withBasePath("/data/project-commit-history.json"), { cache: "no-store" });
       if (!response.ok) throw new Error("Unable to load update history.");
       setHistory(await response.json() as ProjectCommitHistory);
     } catch {

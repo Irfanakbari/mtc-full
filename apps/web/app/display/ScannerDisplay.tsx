@@ -8,6 +8,7 @@ import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { clearDisplayError, clearDisplayItem, lookupDisplayItem, resetDisplayReceipt, submitDisplayTransaction, type DisplayTransactionInput } from "@/store/features/displaySlice";
 import type { AppDispatch, RootState } from "@/store/store";
+import { withBasePath } from "@/lib/base-path";
 import styles from "./scanner-display.module.css";
 import routeStyles from "./display.module.css";
 
@@ -103,7 +104,7 @@ export default function ScannerDisplay() {
     <main className={`${styles.page} ${routeStyles.root}`}>
       <div className={styles.shell}>
         <header className={styles.header}>
-          <div className={styles.logoWrap}><Image src="/images/vtqw.png" alt="Vuteq" width={160} height={46} priority /></div>
+          <div className={styles.logoWrap}><Image src={withBasePath("/images/vtqw.png")} alt="Vuteq" width={160} height={46} priority /></div>
           <div className={styles.headerCopy}><h1>MTC Stock Station</h1><p>Scan. Verify. Submit.</p></div>
           <div className={styles.stationBadge}><span />Ready</div>
         </header>

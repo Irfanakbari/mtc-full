@@ -1,0 +1,96 @@
+name: mtc
+
+services:
+  redis:
+    image: redis:8-alpine
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mtc
+
+  api:
+    image: ${MTC_IMAGE}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      SERVICE_ROLE: api
+      PORT: 31000
+      STORAGE_PATH: /app/storage
+    command: ["api"]
+    ports:
+      - "31000:31000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:31000/v1/health/ready').then(r => {
+          if (!r.ok) process.exit(1) }).catch(() => process.exit(1))
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    volumes:
+      - mtc-documents:/app/storage
+    networks:
+      - mtc
+
+  web:
+    image: ${MTC_IMAGE}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      SERVICE_ROLE: web
+      PORT: 31001
+    command: ["web"]
+    ports:
+      - "31001:31001"
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:31001/mtc/api/health').then(r => {
+          if (!r.ok) process.exit(1) }).catch(() => process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - mtc
+
+networks:
+  mtc:
+    name: mtc-network
+
+volumes:
+  redis-data:
+    name: mtc-redis-data
+  mtc-documents:
+    name: mtc-documents

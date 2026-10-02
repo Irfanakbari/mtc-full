@@ -1,5 +1,5 @@
 .page { min-height: 100vh; background: radial-gradient(circle at 50% -10%, rgba(94,141,178,.36), transparent 36rem), linear-gradient(145deg,#172a3c 0%,#233c52 55%,#192e40 100%); color:#f8fafc; position:relative; overflow-x:hidden; }
-.page::before { content:""; position:fixed; inset:0; background:url("/images/batik5.png") center/680px auto repeat; opacity:.075; pointer-events:none; }
+.page::before { content:""; position:fixed; inset:0; background:url("/mtc/images/batik5.png") center/680px auto repeat; opacity:.075; pointer-events:none; }
 .shell { position:relative; z-index:1; width:min(780px,calc(100% - 28px)); margin:0 auto; padding:clamp(18px,4vh,42px) 0 24px; }
 .header { display:grid; grid-template-columns:112px 1fr auto; align-items:center; gap:16px; margin-bottom:18px; }
 .logoWrap { display:grid; min-height:62px; place-items:center; padding:10px 12px; border:1px solid rgba(255,255,255,.15); border-radius:13px; background:rgba(255,255,255,.08); box-shadow:0 12px 28px rgba(4,13,22,.2); }
