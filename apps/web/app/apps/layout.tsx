@@ -23,17 +23,17 @@ import {
   Dropdown,
   Layout,
   Menu,
-  Modal,
-  Space,
   Spin,
   Tooltip,
-  Typography,
   type MenuProps,
 } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import CreditInformationModal from "./_components/CreditInformationModal";
+import PrivacyPolicyModal from "./_components/PrivacyPolicyModal";
+import UpdateLogModal from "./_components/UpdateLogModal";
 import "../batik.css";
 
 const { Header, Sider, Content, Footer } = Layout;
@@ -114,6 +114,8 @@ function Brand({ collapsed = false }: { collapsed?: boolean }) {
 export default function AppsLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [informationOpen, setInformationOpen] = useState(false);
+  const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
+  const [updateLogOpen, setUpdateLogOpen] = useState(false);
   const { session, loading } = useVuteqSso();
   const pathname = usePathname();
   const { modal } = App.useApp();
@@ -285,19 +287,21 @@ export default function AppsLayout({ children }: { children: React.ReactNode }) 
         </Layout>
       </Layout>
 
-      <Modal
-        title="Credits & Information"
+      <PrivacyPolicyModal
+        open={privacyPolicyOpen}
+        onClose={() => setPrivacyPolicyOpen(false)}
+      />
+      <UpdateLogModal
+        open={updateLogOpen}
+        onClose={() => setUpdateLogOpen(false)}
+        appVersion={APP_VERSION}
+      />
+      <CreditInformationModal
         open={informationOpen}
-        centered
-        footer={<Button type="primary" onClick={() => setInformationOpen(false)}>Close</Button>}
-        onCancel={() => setInformationOpen(false)}
-      >
-        <Space orientation="vertical" size={8} style={{ width: "100%" }}>
-          <Typography.Title level={4} style={{ margin: 0 }}>MTC Inventory System</Typography.Title>
-          <Typography.Text>Quantity-based inventory control with an authoritative stock ledger and auditable inventory counting.</Typography.Text>
-          <Typography.Text type="secondary">Version {APP_VERSION} · PT Vuteq Indonesia</Typography.Text>
-        </Space>
-      </Modal>
+        onClose={() => setInformationOpen(false)}
+        onOpenUpdateLog={() => setUpdateLogOpen(true)}
+        onOpenPrivacyPolicy={() => setPrivacyPolicyOpen(true)}
+      />
     </>
   );
 }

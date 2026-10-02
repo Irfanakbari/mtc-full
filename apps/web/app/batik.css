@@ -21,3 +21,177 @@
   position: relative;
   z-index: 1;
 }
+
+@keyframes mtc-heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+
+@keyframes mtc-credit-glow {
+  0%, 100% { box-shadow: 0 6px 16px rgba(38, 53, 69, 0.08); }
+  50% { box-shadow: 0 8px 20px rgba(38, 53, 69, 0.12); }
+}
+
+@keyframes mtc-credit-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mtc-credit-float {
+  0%, 100% { transform: translateY(0) rotate(-15deg); }
+  50% { transform: translateY(-10px) rotate(-8deg); }
+}
+
+@keyframes mtc-credit-shimmer {
+  from { transform: translateX(-140%) skewX(-18deg); }
+  to { transform: translateX(280%) skewX(-18deg); }
+}
+
+.mtc-credit-modal .ant-modal-content {
+  overflow: hidden;
+  background: #fcfcfa;
+}
+
+.mtc-credit-content > * {
+  animation: mtc-credit-rise 0.45s ease both;
+}
+
+.mtc-credit-content > *:nth-child(2) { animation-delay: 0.08s; }
+.mtc-credit-content > *:nth-child(3) { animation-delay: 0.16s; }
+.mtc-credit-content > *:nth-child(4) { animation-delay: 0.24s; }
+.mtc-credit-content > *:nth-child(5) { animation-delay: 0.32s; }
+
+.mtc-credit-title-icon {
+  display: inline-flex;
+  padding: 8px;
+  border-radius: 4px;
+  color: #fff;
+  background: #4c6a85;
+}
+
+.mtc-credit-title-caption {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.mtc-credit-hero {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24px;
+  padding: 28px 24px;
+  border-radius: 6px;
+  color: #fff;
+  text-align: center;
+  background: #263545;
+  animation: mtc-credit-glow 3s ease-in-out infinite;
+}
+
+.mtc-credit-shimmer {
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+  animation: mtc-credit-shimmer 4s ease-in-out infinite;
+}
+
+.mtc-credit-watermark {
+  position: absolute;
+  top: -18px;
+  right: 18px;
+  color: rgba(255,255,255,0.12);
+  font-size: 92px;
+  animation: mtc-credit-float 3.2s ease-in-out infinite;
+}
+
+.mtc-credit-heart {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.14);
+}
+
+.mtc-credit-heart svg,
+.mtc-credit-project-started svg {
+  color: #fecaca;
+  font-size: 22px;
+  animation: mtc-heartbeat 1.6s ease-in-out infinite;
+}
+
+.mtc-credit-hero h2 {
+  position: relative;
+  margin: 12px 0 0;
+  color: #fff;
+  font-size: 25px;
+}
+
+.mtc-credit-hero p {
+  position: relative;
+  margin: 8px 0 0;
+  color: rgba(255,255,255,0.85);
+}
+
+.mtc-credit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.mtc-credit-column { display: grid; gap: 16px; }
+.mtc-credit-developer { padding: 16px 18px; border-radius: 6px; background: #edf2f6; }
+.mtc-credit-eyebrow { color: #4c6a85; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.mtc-credit-developer-name { margin-top: 4px; color: #293241; font-size: 20px; font-weight: 700; }
+.mtc-credit-quote { margin-top: 6px; color: #475569; font-style: italic; }
+.mtc-development-days { padding: 16px; border-radius: 14px; color: #666; text-align: center; background: #f5f5f5; }
+.mtc-development-days strong { display: block; color: #4c6a85; font-size: 48px; line-height: 1; }
+.mtc-credit-quality-quote { padding: 14px 16px; border-radius: 6px; color: #293241; font-style: italic; text-align: center; background: #edf2f6; }
+.mtc-credit-team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mtc-credit-team-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding-bottom: 8px; }
+.mtc-credit-team-list { margin: 0; padding: 0; list-style: none; }
+.mtc-credit-team-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.mtc-credit-team-list li > span { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.mtc-credit-advisors { padding: 16px; border-radius: 6px; color: #fff; background: #304254; }
+.mtc-credit-advisors h4 { margin: 0 0 10px; padding-bottom: 8px; }
+.mtc-credit-advisors > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.mtc-credit-advisors span { display: flex; align-items: center; gap: 8px; }
+.mtc-credit-advisors i { width: 8px; height: 8px; border-radius: 50%; background: #ffd700; }
+.mtc-credit-promise { padding: 14px 16px; border-radius: 12px; color: #b45309; font-style: italic; text-align: center; background: #fffbeb; }
+.mtc-credit-project-started { margin-top: 24px; padding-top: 16px; color: #999; font-size: 12px; text-align: center; }
+.mtc-credit-project-started svg { color: #dc2626; font-size: inherit; }
+
+.mtc-security-stack { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; background: #f8fafc; }
+.mtc-security-badges { display: flex; align-items: center; justify-content: center; gap: 24px; min-height: 72px; }
+
+.mtc-release-summary { margin-bottom: 16px; padding: 16px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; }
+.mtc-release-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mtc-release-heading strong { color: #1e3a5f; font-size: 16px; }
+.mtc-release-summary p { margin: 8px 0 0; color: #334155; font-size: 13px; line-height: 1.6; }
+.mtc-release-summary ul { margin: 10px 0 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.65; }
+.mtc-update-count { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 14px 16px; border-radius: 6px; color: #4c6a85; background: #edf2f6; }
+.mtc-update-count span { display: block; margin-top: 3px; color: #475569; font-size: 12px; }
+.mtc-update-list { display: grid; gap: 12px; }
+.mtc-update-entry { position: relative; padding: 14px 16px 14px 22px; border-radius: 12px; background: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.03); }
+.mtc-update-entry > i { position: absolute; top: 20px; left: 9px; width: 6px; height: 6px; border-radius: 50%; background: #4c6a85; }
+.mtc-update-entry > i.is-fix { background: #a34a4a; }
+.mtc-update-entry-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mtc-update-entry-heading strong { color: #1e293b; font-weight: 600; line-height: 1.45; }
+.mtc-update-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 9px; color: #64748b; font-size: 12px; }
+
+@media (max-width: 720px) {
+  .mtc-credit-grid { grid-template-columns: 1fr; }
+  .mtc-credit-modal .ant-modal-footer { display: flex; flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mtc-credit-content > *,
+  .mtc-credit-hero,
+  .mtc-credit-shimmer,
+  .mtc-credit-watermark,
+  .mtc-credit-heart svg,
+  .mtc-credit-project-started svg { animation: none !important; }
+}

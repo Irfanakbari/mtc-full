@@ -1,3 +1,13 @@
+x-mtc-app: &mtc-app
+  image: ${MTC_IMAGE:-mtc-app:local}
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      API_URL: ${API_URL:-http://api:31000}
+      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
+      VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:-http://localhost:31001}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -25,8 +35,10 @@ services:
       retries: 10
     restart: unless-stopped
   api:
-    build: { context: ., dockerfile: Dockerfile.api }
+    <<: *mtc-app
+    command: ["api"]
     environment:
+      SERVICE_ROLE: api
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mtc}
       PORT: 31000
       NODE_ENV: production
@@ -46,14 +58,11 @@ services:
       postgres: { condition: service_healthy }
     restart: unless-stopped
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-      args:
-        API_URL: http://api:31000
-        VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
-        VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:-http://localhost:31001}
+    <<: *mtc-app
+    command: ["web"]
     environment:
+      SERVICE_ROLE: web
+      PORT: 31001
       API_URL: http://api:31000
       VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
       VUTEQ_SSO_SECRET: ${VUTEQ_SSO_SECRET:?Set VUTEQ_SSO_SECRET in .env}

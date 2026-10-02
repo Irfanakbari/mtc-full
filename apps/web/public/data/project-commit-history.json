@@ -1,0 +1,42 @@
+{
+  "repository": {
+    "source": "git-history",
+    "repository": "https://github.com/Irfanakbari/mtc-full",
+    "generatedAt": "2026-10-01",
+    "commitCount": 4
+  },
+  "commits": [
+    {
+      "hash": "2438306c728f79d7043424d1903c1b4b34f897a3",
+      "shortHash": "2438306",
+      "author": "irfanakbari",
+      "date": "2026-10-01T16:22:57+07:00",
+      "category": "Fix",
+      "summary": "Separate operational stock transactions from the complete ledger and display readable actor names"
+    },
+    {
+      "hash": "02b587914c788cce32f31a0777b26fe45431d228",
+      "shortHash": "02b5879",
+      "author": "irfanakbari",
+      "date": "2026-10-01T15:57:16+07:00",
+      "category": "Fix",
+      "summary": "Bind and focus the operator display quantity input safely"
+    },
+    {
+      "hash": "b163279e1ce428e6d3f36bd9892cc3f75baed7be",
+      "shortHash": "b163279",
+      "author": "irfanakbari",
+      "date": "2026-10-01T15:51:10+07:00",
+      "category": "Feature",
+      "summary": "Add the scanner-first operator display and seed inventory data"
+    },
+    {
+      "hash": "9875c924fde2217207c48e8716241e98eef8e680",
+      "shortHash": "9875c92",
+      "author": "irfanakbari",
+      "date": "2026-10-01T14:37:58+07:00",
+      "category": "Feature",
+      "summary": "Bootstrap the MTC inventory monorepo"
+    }
+  ]
+}
