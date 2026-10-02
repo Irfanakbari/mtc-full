@@ -4,9 +4,9 @@ x-mtc-app: &mtc-app
     context: .
     dockerfile: Dockerfile
     args:
-      API_URL: ${API_URL:-http://api:31000}
-      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
-      VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:-http://localhost:31001}
+      API_URL: ${API_URL:?Set API_URL in .env}
+      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:?Set VUTEQ_SSO_BASE_URL in .env}
+      VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:?Set VUTEQ_SSO_PUBLIC_ORIGIN in .env}
 
 services:
   postgres:
@@ -43,7 +43,7 @@ services:
       PORT: 31000
       NODE_ENV: production
       VUTEQ_SSO_ENABLED: "true"
-      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
+      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:?Set VUTEQ_SSO_BASE_URL in .env}
       VUTEQ_SSO_SECRET: ${VUTEQ_SSO_SECRET:?Set VUTEQ_SSO_SECRET in .env}
       VUTEQ_SSO_ALLOWED_CLIENT_IDS: ${VUTEQ_SSO_ALLOWED_CLIENT_IDS:-mtc-web}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
@@ -63,10 +63,10 @@ services:
     environment:
       SERVICE_ROLE: web
       PORT: 31001
-      API_URL: http://api:31000
-      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:-https://sso.vuteq.co.id}
+      API_URL: ${API_URL:?Set API_URL in .env}
+      VUTEQ_SSO_BASE_URL: ${VUTEQ_SSO_BASE_URL:?Set VUTEQ_SSO_BASE_URL in .env}
       VUTEQ_SSO_SECRET: ${VUTEQ_SSO_SECRET:?Set VUTEQ_SSO_SECRET in .env}
-      VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:-http://localhost:31001}
+      VUTEQ_SSO_PUBLIC_ORIGIN: ${VUTEQ_SSO_PUBLIC_ORIGIN:?Set VUTEQ_SSO_PUBLIC_ORIGIN in .env}
       VUTEQ_SSO_TRUST_PROXY: ${VUTEQ_SSO_TRUST_PROXY:-false}
       REDIS_HOST: redis
       REDIS_PORT: 6379

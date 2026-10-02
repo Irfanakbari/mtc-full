@@ -44,15 +44,17 @@ environment or secret-management mechanism.
 
 ## GitHub Actions
 
-`.github/workflows/ci.yml` validates Prisma, applies migrations only to its
-disposable PostgreSQL service, runs lint/test/build checks, and verifies that the
-combined `mtc-app` image builds successfully. It does not publish an image.
+`.github/workflows/ci-and-publish.yml` validates Prisma, applies migrations only
+to its disposable PostgreSQL service, and runs lint, test, and build checks.
+After a successful push validation, it publishes the combined `mtc-app` image to
+Docker Hub with an immutable `sha-*` tag and a `production` or `staging` tag.
 
 An automated Docker Hub publish job requires these GitHub Environment secrets:
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
 
-Recommended environment variables are `API_URL`, `VUTEQ_SSO_BASE_URL`, and
-`VUTEQ_SSO_PUBLIC_ORIGIN`. Keep the `production` and `staging` values in their
-corresponding GitHub Environments.
+Required GitHub Environment variables or secrets are `API_URL`,
+`VUTEQ_SSO_BASE_URL`, and `VUTEQ_SSO_PUBLIC_ORIGIN`. Keep the `production` and
+`staging` values in their corresponding GitHub Environments. The workflow does
+not provide deployment URL fallbacks.
