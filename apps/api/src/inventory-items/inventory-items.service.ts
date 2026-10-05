@@ -14,7 +14,7 @@ export class InventoryItemsService {
   async create(dto: CreateInventoryItemDto, actor: CurrentUserIdentity) {
     return withSerializableInventory(this.prisma, async (tx) => {
       const opening = new Prisma.Decimal(dto.openingBalance ?? 0);
-      const item = await tx.inventoryItem.create({ data: { ItemCode: dto.itemCode, Name: dto.name, Brand: dto.brand || null, Model: dto.model || null, SerialNumber: dto.serialNumber || null, Unit: dto.unit, AddressLocation: dto.addressLocation, MinimumStock: dto.minimumStock, CurrentBalance: opening, CreatedBy: actor.username } });
+      const item = await tx.inventoryItem.create({ data: { ItemCode: dto.itemCode, Name: dto.name, Brand: dto.brand?.trim() || null, Model: dto.model?.trim() || null, SerialNumber: dto.serialNumber?.trim() || null, Unit: dto.unit, AddressLocation: dto.addressLocation, MinimumStock: dto.minimumStock, CurrentBalance: opening, CreatedBy: actor.username } });
       if (dto.openingBalance !== undefined) {
         await tx.inventoryLedger.create({ data: { ItemId: item.Id, TransactionType: InventoryTransactionType.OPENING_BALANCE, ReferenceDoc: dto.referenceDoc || `OPENING-${item.ItemCode}`, BalanceBefore: 0, QtyIn: opening, QtyOut: 0, BalanceAfter: opening, CreatedBy: actor.username, Notes: dto.notes } });
       }
@@ -51,7 +51,20 @@ export class InventoryItemsService {
 
   async update(id: string, dto: UpdateInventoryItemDto, actor: CurrentUserIdentity) {
     const before = await this.findOne(id);
-    const updated = await this.prisma.inventoryItem.update({ where: { Id: id }, data: { ItemCode: dto.itemCode, Name: dto.name, Brand: dto.brand, Model: dto.model, SerialNumber: dto.serialNumber, Unit: dto.unit, AddressLocation: dto.addressLocation, MinimumStock: dto.minimumStock, UpdatedBy: actor.username } });
+    const updated = await this.prisma.inventoryItem.update({
+      where: { Id: id },
+      data: {
+        ItemCode: dto.itemCode,
+        Name: dto.name,
+        Brand: dto.brand !== undefined ? (dto.brand?.trim() || null) : undefined,
+        Model: dto.model !== undefined ? (dto.model?.trim() || null) : undefined,
+        SerialNumber: dto.serialNumber !== undefined ? (dto.serialNumber?.trim() || null) : undefined,
+        Unit: dto.unit,
+        AddressLocation: dto.addressLocation,
+        MinimumStock: dto.minimumStock,
+        UpdatedBy: actor.username,
+      },
+    });
     await this.prisma.actionAuditEvent.create({ data: { EntityType: 'InventoryItem', EntityId: id, Action: 'UPDATE', Actor: actor.username, Before: JSON.parse(JSON.stringify(before)), After: JSON.parse(JSON.stringify(updated)) } });
     return updated;
   }

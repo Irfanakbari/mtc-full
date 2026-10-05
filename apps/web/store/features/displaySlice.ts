@@ -5,6 +5,7 @@ export interface DisplayItem {
   Id: string;
   ItemCode: string;
   Name: string;
+  SerialNumber?: string | null;
   Unit: string;
   AddressLocation: string;
   CurrentBalance: string;

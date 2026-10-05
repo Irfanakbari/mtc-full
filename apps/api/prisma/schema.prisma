@@ -41,7 +41,7 @@ model InventoryItem {
   Name              String   @db.VarChar(200)
   Brand             String?  @db.VarChar(120)
   Model             String?  @db.VarChar(120)
-  SerialNumber      String?  @db.VarChar(160)
+  SerialNumber      String?  @unique @db.VarChar(160)
   Unit              String   @default("PCS") @db.VarChar(30)
   AddressLocation   String   @unique @db.VarChar(120)
   CurrentBalance    Decimal  @default(0) @db.Decimal(18, 2)

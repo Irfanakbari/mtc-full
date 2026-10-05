@@ -47,7 +47,7 @@ export default function ScannerDisplay() {
   async function resolvePart(): Promise<void> {
     const partNumber = form.getFieldValue("partNumber")?.trim();
     if (!partNumber) {
-      form.setFields([{ name: "partNumber", errors: ["Scan or enter a part number"] }]);
+      form.setFields([{ name: "partNumber", errors: ["Scan or enter an item code, serial number, or rack location"] }]);
       partInput.current?.focus();
       return;
     }
@@ -55,10 +55,10 @@ export default function ScannerDisplay() {
       const result = await dispatch(lookupDisplayItem(partNumber)).unwrap();
       form.setFieldValue("partNumber", result.data.ItemCode);
       form.setFields([{ name: "partNumber", errors: [] }]);
-      message.success("Part verified");
+      message.success("Item verified");
       focusQuantity();
     } catch (lookupError) {
-      message.error(typeof lookupError === "string" ? lookupError : "Part number was not found");
+      message.error(typeof lookupError === "string" ? lookupError : "Item was not found");
       window.setTimeout(() => partInput.current?.focus({ cursor: "all" }), 40);
     }
   }
@@ -75,7 +75,7 @@ export default function ScannerDisplay() {
 
   async function submit(values: FormValues): Promise<void> {
     if (!selectedItem) {
-      form.setFields([{ name: "partNumber", errors: ["Verify the part number first"] }]);
+      form.setFields([{ name: "partNumber", errors: ["Verify the item first"] }]);
       partInput.current?.focus({ cursor: "all" });
       return;
     }
@@ -111,7 +111,7 @@ export default function ScannerDisplay() {
 
         <Card className={styles.card}>
           <div className={styles.progress} aria-label="Transaction steps">
-            <div className={!selectedItem ? styles.activeStep : styles.completeStep}><b>1</b><span>Scan part</span></div><i />
+            <div className={!selectedItem ? styles.activeStep : styles.completeStep}><b>1</b><span>Scan item / rack</span></div><i />
             <div className={selectedItem ? styles.activeStep : ""}><b>2</b><span>Enter quantity</span></div><i />
             <div><b>3</b><span>Operator & submit</span></div>
           </div>
@@ -123,8 +123,8 @@ export default function ScannerDisplay() {
 
             {error && <Alert className={styles.alert} type="error" showIcon title={error} closable={{ onClose: () => dispatch(clearDisplayError()) }} />}
 
-            <Form.Item name="partNumber" label="Part Number" rules={[{ required: true, whitespace: true, message: "Scan or enter a part number" }]}>
-              <Input ref={partInput} allowClear prefix={loadingItems ? <LoadingOutlined spin /> : <ScanOutlined />} suffix={<span className={styles.enterHint}>Scan then Enter ↵</span>} placeholder="Scan QR code or type part number" maxLength={80} disabled={loadingItems || submitting} onChange={() => { if (selectedItem) dispatch(clearDisplayItem()); }} onPressEnter={(event) => { event.preventDefault(); void resolvePart(); }} />
+            <Form.Item name="partNumber" label="Item Code / Serial / Rack Location" rules={[{ required: true, whitespace: true, message: "Scan or enter item code, serial number, or rack location" }]}>
+              <Input ref={partInput} allowClear prefix={loadingItems ? <LoadingOutlined spin /> : <ScanOutlined />} suffix={<span className={styles.enterHint}>Scan then Enter ↵</span>} placeholder="Scan QR/Barcode Item Code, Serial Number, or Rack Location" maxLength={160} disabled={loadingItems || submitting} onChange={() => { if (selectedItem) dispatch(clearDisplayItem()); }} onPressEnter={(event) => { event.preventDefault(); void resolvePart(); }} />
             </Form.Item>
 
             {selectedItem && <div className={styles.partCard} aria-live="polite"><CheckCircleFilled /><div className={styles.partIdentity}><span>{selectedItem.ItemCode}</span><strong>{selectedItem.Name}</strong></div><div><span>Location</span><strong>{selectedItem.AddressLocation}</strong></div><div><span>Balance</span><strong>{selectedItem.CurrentBalance} {selectedItem.Unit}</strong></div></div>}
