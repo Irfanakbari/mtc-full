@@ -20,7 +20,7 @@ interface MutationPayload {
       BalanceAfter?: string;
     };
     item?: {
-      ItemCode?: string;
+      AddressLocation?: string;
       Name?: string;
       Unit?: string;
       CurrentBalance?: string;
@@ -92,7 +92,7 @@ export async function POST(request: Request): Promise<Response> {
       data: {
         ledgerId: payload?.data?.ledger?.Id,
         transactionDate: payload?.data?.ledger?.TransactionDate,
-        itemCode: payload?.data?.item?.ItemCode,
+        addressLocation: payload?.data?.item?.AddressLocation,
         itemName: payload?.data?.item?.Name,
         unit: payload?.data?.item?.Unit,
         balanceAfter: payload?.data?.item?.CurrentBalance ?? payload?.data?.ledger?.BalanceAfter,

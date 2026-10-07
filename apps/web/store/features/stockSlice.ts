@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import { api, type ApiEnvelope, type Pagination } from '../utils/api';
 import type { InventoryItem } from './itemsSlice';
 export type TransactionType = 'OPENING_BALANCE'|'STOCK_IN'|'STOCK_OUT'|'SCRAP'|'STOCK_OPNAME_DIFF'|'REVERSAL';
-export interface Ledger { Id: string; ItemId: string; TransactionDate: string; TransactionType: TransactionType; ReferenceDoc: string; BalanceBefore: string; QtyIn: string; QtyOut: string; BalanceAfter: string; CreatedBy: string; ActorDisplayName?: string; Notes: string | null; Item: Pick<InventoryItem,'ItemCode'|'Name'|'AddressLocation'|'Unit'> }
+export interface Ledger { Id: string; ItemId: string; TransactionDate: string; TransactionType: TransactionType; ReferenceDoc: string; BalanceBefore: string; QtyIn: string; QtyOut: string; BalanceAfter: string; CreatedBy: string; ActorDisplayName?: string; Notes: string | null; Item: Pick<InventoryItem,'Model'|'Name'|'AddressLocation'|'Unit'> }
 export interface LedgerQuery { page: number; limit: number; search: string; transactionType?: TransactionType; itemId?: string; actor?: string; from?: string; to?: string }
 interface State { data: Ledger[]; query: LedgerQuery; pagination: Pagination; loading: boolean; saving: boolean; error: string | null }
 const initialState: State = { data: [], query: { page: 1, limit: 50, search: '' }, pagination: { page: 1, limit: 50, totalItems: 0, totalPages: 0 }, loading: false, saving: false, error: null };

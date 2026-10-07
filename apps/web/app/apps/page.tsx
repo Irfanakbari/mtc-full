@@ -160,7 +160,7 @@ export default function DashboardPage() {
           scroll={{ x: "max-content" }}
           locale={{ emptyText: "No recent transactions" }}
           columns={[
-            { title: "Item Code", dataIndex: ["Item", "ItemCode"] },
+            { title: "Model", dataIndex: ["Item", "Model"] },
             { title: "Item Name", dataIndex: ["Item", "Name"] },
             { title: "Address", dataIndex: ["Item", "AddressLocation"] },
             { title: "Type", dataIndex: "TransactionType", render: (value) => <Tag>{value}</Tag> },

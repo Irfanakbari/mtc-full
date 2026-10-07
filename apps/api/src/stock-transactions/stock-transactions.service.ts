@@ -57,11 +57,11 @@ export class StockTransactionsService {
         : { in: query.transactionType ? [] : allowedTypes };
     } else if (query.transactionType) where.TransactionType = query.transactionType;
     if (query.actor) where.CreatedBy = { contains: query.actor, mode: 'insensitive' };
-    if (query.search) where.OR = [{ ReferenceDoc: { contains: query.search, mode: 'insensitive' } }, { Item: { ItemCode: { contains: query.search, mode: 'insensitive' } } }, { Item: { Name: { contains: query.search, mode: 'insensitive' } } }];
+    if (query.search) where.OR = [{ ReferenceDoc: { contains: query.search, mode: 'insensitive' } }, { Item: { Model: { contains: query.search, mode: 'insensitive' } } }, { Item: { Name: { contains: query.search, mode: 'insensitive' } } }];
     if (query.from || query.to) where.TransactionDate = { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) };
     const [total, data] = await Promise.all([
       this.prisma.inventoryLedger.count({ where }),
-      this.prisma.inventoryLedger.findMany({ where, include: { Item: { select: { ItemCode: true, Name: true, AddressLocation: true, Unit: true } } }, orderBy: [{ TransactionDate: 'desc' }, { Id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }),
+      this.prisma.inventoryLedger.findMany({ where, include: { Item: { select: { Model: true, Name: true, AddressLocation: true, Unit: true } } }, orderBy: [{ TransactionDate: 'desc' }, { Id: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit }),
     ]);
     return { data: await this.withActorDisplayNames(data), meta: { page: query.page, limit: query.limit, totalItems: total, totalPages: Math.ceil(total / query.limit) } };
   }
@@ -73,12 +73,12 @@ export class StockTransactionsService {
   }
 
   async reconcile(itemId?: string) {
-    const items = await this.prisma.inventoryItem.findMany({ where: itemId ? { Id: itemId } : undefined, select: { Id: true, ItemCode: true, CurrentBalance: true } });
-    const result: Array<{ itemId: string; itemCode: string; cachedBalance: Prisma.Decimal; ledgerBalance: Prisma.Decimal; reconciled: boolean }> = [];
+    const items = await this.prisma.inventoryItem.findMany({ where: itemId ? { Id: itemId } : undefined, select: { Id: true, Model: true, CurrentBalance: true } });
+    const result: Array<{ itemId: string; model: string | null; cachedBalance: Prisma.Decimal; ledgerBalance: Prisma.Decimal; reconciled: boolean }> = [];
     for (const item of items) {
       const aggregate = await this.prisma.inventoryLedger.aggregate({ where: { ItemId: item.Id }, _sum: { QtyIn: true, QtyOut: true } });
       const ledgerBalance = (aggregate._sum.QtyIn ?? new Prisma.Decimal(0)).sub(aggregate._sum.QtyOut ?? new Prisma.Decimal(0));
-      result.push({ itemId: item.Id, itemCode: item.ItemCode, cachedBalance: item.CurrentBalance, ledgerBalance, reconciled: item.CurrentBalance.equals(ledgerBalance) });
+      result.push({ itemId: item.Id, model: item.Model, cachedBalance: item.CurrentBalance, ledgerBalance, reconciled: item.CurrentBalance.equals(ledgerBalance) });
     }
     return result;
   }

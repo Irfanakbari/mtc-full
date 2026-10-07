@@ -34,7 +34,7 @@ export function StockLedgerTable({ mode = 'ledger' }: StockLedgerTableProps) {
     scroll={{ x: 'max-content', y: 'calc(100vh - 380px)' }}
     style={{ fontSize: 11 }}
     columns={[
-      { title: 'Item Code', dataIndex: ['Item', 'ItemCode'], filterDropdown: ({ confirm }) => <div className="p-2"><Input placeholder="Search item or reference" value={query.search} onChange={(event) => dispatch(setLedgerQuery({ search: event.target.value, page: 1 }))} onPressEnter={() => confirm()} /></div> },
+      { title: 'Model', dataIndex: ['Item', 'Model'], filterDropdown: ({ confirm }) => <div className="p-2"><Input placeholder="Search item or reference" value={query.search} onChange={(event) => dispatch(setLedgerQuery({ search: event.target.value, page: 1 }))} onPressEnter={() => confirm()} /></div> },
       { title: 'Item Name', dataIndex: ['Item', 'Name'] },
       { title: 'Address', dataIndex: ['Item', 'AddressLocation'] },
       { title: 'Type', dataIndex: 'TransactionType', filterDropdown: ({ confirm }) => <div className="p-2"><Select allowClear className="w-56" placeholder="Transaction type" options={availableTypes.map((value) => ({ value, label: value }))} value={query.transactionType} onChange={(value) => { dispatch(setLedgerQuery({ transactionType: value, page: 1 })); confirm(); }} /></div>, render: (value: TransactionType) => <Tag color={value === 'STOCK_IN' || value === 'OPENING_BALANCE' ? 'success' : value === 'SCRAP' ? 'error' : 'blue'}>{value}</Tag> },

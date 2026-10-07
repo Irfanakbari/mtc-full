@@ -16,7 +16,7 @@ export class DashboardController {
       this.prisma.inventoryItem.aggregate({ where: { IsActive: true }, _sum: { CurrentBalance: true } }),
       this.prisma.inventoryLedger.count({ where: { TransactionDate: { gte: start } } }),
       this.prisma.stockOpname.count({ where: { Status: OpnameStatus.IN_PROGRESS } }),
-      this.prisma.inventoryLedger.findMany({ include: { Item: { select: { ItemCode: true, Name: true } } }, orderBy: { TransactionDate: 'desc' }, take: 10 }),
+      this.prisma.inventoryLedger.findMany({ include: { Item: { select: { Model: true, Name: true } } }, orderBy: { TransactionDate: 'desc' }, take: 10 }),
     ]);
     const from = new Date(); from.setDate(from.getDate() - 6); from.setHours(0,0,0,0);
     const trendRows = await this.prisma.inventoryLedger.findMany({ where: { TransactionDate: { gte: from }, TransactionType: { in: [InventoryTransactionType.STOCK_IN, InventoryTransactionType.STOCK_OUT, InventoryTransactionType.SCRAP] } }, select: { TransactionDate: true, TransactionType: true, QtyIn: true, QtyOut: true } });

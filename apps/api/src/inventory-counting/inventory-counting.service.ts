@@ -44,7 +44,7 @@ export class InventoryCountingService {
   }
 
   async detail(id: string) {
-    const value = await this.prisma.stockOpname.findUnique({ where: { Id: id }, include: { Details: { include: { Item: true }, orderBy: { Item: { ItemCode: 'asc' } } }, Selections: { include: { Item: true } }, Attachments: true } });
+    const value = await this.prisma.stockOpname.findUnique({ where: { Id: id }, include: { Details: { include: { Item: true }, orderBy: { Item: { Name: 'asc' } } }, Selections: { include: { Item: true } }, Attachments: true } });
     if (!value) throw new NotFoundException('Inventory counting session not found');
     return value;
   }
@@ -104,7 +104,7 @@ export class InventoryCountingService {
         await lockInventoryItem(tx, detail.ItemId);
         const item = await tx.inventoryItem.findUnique({ where: { Id: detail.ItemId } });
         if (!item) throw new NotFoundException('Inventory item from snapshot no longer exists');
-        if (!item.CurrentBalance.equals(detail.SystemQty)) throw new ConflictException(`Balance changed after snapshot for item ${item.ItemCode}`);
+        if (!item.CurrentBalance.equals(detail.SystemQty)) throw new ConflictException(`Balance changed after snapshot for item ${item.Name}`);
         const actual = detail.ActualQty!; const difference = actual.sub(item.CurrentBalance);
         await tx.inventoryItem.update({ where: { Id: item.Id }, data: { CurrentBalance: actual, UpdatedBy: actor.username } });
         await tx.stockOpnameDetail.update({ where: { Id: detail.Id }, data: { DifferenceQty: difference } });
@@ -133,14 +133,14 @@ export class InventoryCountingService {
   async worksheet(id: string): Promise<Buffer> {
     const session = await this.detail(id); const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('Stock Opname', { views: [{ state: 'frozen', ySplit: 4 }] });
     sheet.addRow(['MTC Inventory Counting Worksheet']); sheet.addRow(['Record Number', session.RecordNumber]); sheet.addRow(['Status', session.Status]); sheet.addRow([]);
-    sheet.addRow(['No', 'Item Code', 'Item Name', 'Address', 'Unit', 'System Qty', 'Actual Qty', 'Difference', 'Notes']);
-    session.Details.forEach((detail, index) => sheet.addRow([index + 1, detail.Item.ItemCode, detail.Item.Name, detail.Item.AddressLocation, detail.Item.Unit, Number(detail.SystemQty), detail.ActualQty === null ? '' : Number(detail.ActualQty), detail.DifferenceQty === null ? '' : Number(detail.DifferenceQty), detail.Notes ?? '']));
+    sheet.addRow(['No', 'Item Name', 'Model', 'Specification', 'Address', 'Unit', 'System Qty', 'Actual Qty', 'Difference', 'Notes']);
+    session.Details.forEach((detail, index) => sheet.addRow([index + 1, detail.Item.Name, detail.Item.Model, detail.Item.Specification, detail.Item.AddressLocation, detail.Item.Unit, Number(detail.SystemQty), detail.ActualQty === null ? '' : Number(detail.ActualQty), detail.DifferenceQty === null ? '' : Number(detail.DifferenceQty), detail.Notes ?? '']));
     return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 
   async finalReport(id: string): Promise<Buffer> {
     const session = await this.detail(id); if (session.Status !== OpnameStatus.COMPLETED) throw new ConflictException('Final report is only available for completed inventory counting');
-    return new Promise((resolveBuffer, reject) => { const chunks: Buffer[] = []; const pdf = new PDFDocument({ margin: 36, size: 'A4' }); pdf.on('data', (chunk: Buffer) => chunks.push(chunk)); pdf.on('end', () => resolveBuffer(Buffer.concat(chunks))); pdf.on('error', reject); pdf.fontSize(18).text('MTC Inventory Counting Final Report'); pdf.moveDown().fontSize(10).text(`Record: ${session.RecordNumber}`).text(`Completed by: ${session.CompletedBy ?? '-'}`).text(`Completed at: ${session.CompletedAt?.toISOString() ?? '-'}`); pdf.moveDown(); session.Details.forEach((d, index) => { if (pdf.y > 750) pdf.addPage(); pdf.text(`${index + 1}. ${d.Item.ItemCode} | ${d.Item.Name} | ${d.Item.AddressLocation} | System ${d.SystemQty.toString()} | Actual ${d.ActualQty?.toString() ?? '-'} | Diff ${d.DifferenceQty?.toString() ?? '-'}`); }); pdf.end(); });
+    return new Promise((resolveBuffer, reject) => { const chunks: Buffer[] = []; const pdf = new PDFDocument({ margin: 36, size: 'A4' }); pdf.on('data', (chunk: Buffer) => chunks.push(chunk)); pdf.on('end', () => resolveBuffer(Buffer.concat(chunks))); pdf.on('error', reject); pdf.fontSize(18).text('MTC Inventory Counting Final Report'); pdf.moveDown().fontSize(10).text(`Record: ${session.RecordNumber}`).text(`Completed by: ${session.CompletedBy ?? '-'}`).text(`Completed at: ${session.CompletedAt?.toISOString() ?? '-'}`); pdf.moveDown(); session.Details.forEach((d, index) => { if (pdf.y > 750) pdf.addPage(); pdf.text(`${index + 1}. ${d.Item.Name} | ${d.Item.Model ?? '-'} | ${d.Item.Specification ?? '-'} | ${d.Item.AddressLocation} | System ${d.SystemQty.toString()} | Actual ${d.ActualQty?.toString() ?? '-'} | Diff ${d.DifferenceQty?.toString() ?? '-'}`); }); pdf.end(); });
   }
 
   async addAttachment(id: string, file: Express.Multer.File, actor: CurrentUserIdentity) {

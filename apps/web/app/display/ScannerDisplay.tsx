@@ -47,13 +47,13 @@ export default function ScannerDisplay() {
   async function resolvePart(): Promise<void> {
     const partNumber = form.getFieldValue("partNumber")?.trim();
     if (!partNumber) {
-      form.setFields([{ name: "partNumber", errors: ["Scan or enter an item code, serial number, or rack location"] }]);
+      form.setFields([{ name: "partNumber", errors: ["Scan or enter a rack location"] }]);
       partInput.current?.focus();
       return;
     }
     try {
       const result = await dispatch(lookupDisplayItem(partNumber)).unwrap();
-      form.setFieldValue("partNumber", result.data.ItemCode);
+      form.setFieldValue("partNumber", result.data.AddressLocation);
       form.setFields([{ name: "partNumber", errors: [] }]);
       message.success("Item verified");
       focusQuantity();
@@ -97,7 +97,7 @@ export default function ScannerDisplay() {
   }
 
   if (receipt) {
-    return <main className={`${styles.page} ${routeStyles.root}`}><div className={styles.shell}><Card className={`${styles.card} ${styles.receiptCard}`}><Result status="success" icon={<CheckCircleFilled className={styles.successIcon} />} title={`Stock ${receipt.direction === "IN" ? "In" : "Out"} Recorded`} subTitle={`${receipt.itemCode} · ${receipt.quantity} ${receipt.unit} · New balance ${receipt.balanceAfter} ${receipt.unit}`} extra={<Button type="primary" size="large" onClick={startAnother}>Next Transaction <span className={styles.enterKey}>Enter ↵</span></Button>}><div className={styles.receiptDetails}><div><span>Part</span><strong>{receipt.itemCode} — {receipt.itemName}</strong></div><div><span>Operator</span><strong>{receipt.operatorName}</strong></div><div><span>Reference</span><strong>{receipt.referenceDoc}</strong></div></div></Result></Card></div></main>;
+    return <main className={`${styles.page} ${routeStyles.root}`}><div className={styles.shell}><Card className={`${styles.card} ${styles.receiptCard}`}><Result status="success" icon={<CheckCircleFilled className={styles.successIcon} />} title={`Stock ${receipt.direction === "IN" ? "In" : "Out"} Recorded`} subTitle={`${receipt.addressLocation} · ${receipt.quantity} ${receipt.unit} · New balance ${receipt.balanceAfter} ${receipt.unit}`} extra={<Button type="primary" size="large" onClick={startAnother}>Next Transaction <span className={styles.enterKey}>Enter ↵</span></Button>}><div className={styles.receiptDetails}><div><span>Part</span><strong>{receipt.addressLocation} — {receipt.itemName}</strong></div><div><span>Operator</span><strong>{receipt.operatorName}</strong></div><div><span>Reference</span><strong>{receipt.referenceDoc}</strong></div></div></Result></Card></div></main>;
   }
 
   return (
@@ -111,7 +111,7 @@ export default function ScannerDisplay() {
 
         <Card className={styles.card}>
           <div className={styles.progress} aria-label="Transaction steps">
-            <div className={!selectedItem ? styles.activeStep : styles.completeStep}><b>1</b><span>Scan item / rack</span></div><i />
+            <div className={!selectedItem ? styles.activeStep : styles.completeStep}><b>1</b><span>Scan rack location</span></div><i />
             <div className={selectedItem ? styles.activeStep : ""}><b>2</b><span>Enter quantity</span></div><i />
             <div><b>3</b><span>Operator & submit</span></div>
           </div>
@@ -123,11 +123,11 @@ export default function ScannerDisplay() {
 
             {error && <Alert className={styles.alert} type="error" showIcon title={error} closable={{ onClose: () => dispatch(clearDisplayError()) }} />}
 
-            <Form.Item name="partNumber" label="Item Code / Serial / Rack Location" rules={[{ required: true, whitespace: true, message: "Scan or enter item code, serial number, or rack location" }]}>
-              <Input ref={partInput} allowClear prefix={loadingItems ? <LoadingOutlined spin /> : <ScanOutlined />} suffix={<span className={styles.enterHint}>Scan then Enter ↵</span>} placeholder="Scan QR/Barcode Item Code, Serial Number, or Rack Location" maxLength={160} disabled={loadingItems || submitting} onChange={() => { if (selectedItem) dispatch(clearDisplayItem()); }} onPressEnter={(event) => { event.preventDefault(); void resolvePart(); }} />
+            <Form.Item name="partNumber" label="Rack Location" rules={[{ required: true, whitespace: true, message: "Scan or enter rack location" }]}>
+              <Input ref={partInput} allowClear prefix={loadingItems ? <LoadingOutlined spin /> : <ScanOutlined />} suffix={<span className={styles.enterHint}>Scan then Enter ↵</span>} placeholder="Scan QR/Barcode Rack Location" maxLength={120} disabled={loadingItems || submitting} onChange={() => { if (selectedItem) dispatch(clearDisplayItem()); }} onPressEnter={(event) => { event.preventDefault(); void resolvePart(); }} />
             </Form.Item>
 
-            {selectedItem && <div className={styles.partCard} aria-live="polite"><CheckCircleFilled /><div className={styles.partIdentity}><span>{selectedItem.ItemCode}</span><strong>{selectedItem.Name}</strong></div><div><span>Location</span><strong>{selectedItem.AddressLocation}</strong></div><div><span>Balance</span><strong>{selectedItem.CurrentBalance} {selectedItem.Unit}</strong></div></div>}
+            {selectedItem && <div className={styles.partCard} aria-live="polite"><CheckCircleFilled /><div className={styles.partIdentity}><span>{selectedItem.Model ?? "Part"}</span><strong>{selectedItem.Name}</strong><span>{selectedItem.Specification}</span></div><div><span>Location</span><strong>{selectedItem.AddressLocation}</strong></div><div><span>Balance</span><strong>{selectedItem.CurrentBalance} {selectedItem.Unit}</strong></div></div>}
 
             <div className={styles.entryGrid}>
               <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: "Enter quantity" }, { validator: async (_, value) => { if (direction === "OUT" && selectedItem && Number(value) > Number(selectedItem.CurrentBalance)) throw new Error("Quantity exceeds current balance"); } }]}>

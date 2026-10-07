@@ -25,6 +25,8 @@ describe("paginated query DTOs", () => {
       lowStock: "true",
     });
 
+    expect(query.sortBy).toBe("AddressLocation");
+    expect(query.sortOrder).toBe("asc");
     expect(query.active).toBe(false);
     expect(query.lowStock).toBe(true);
     expect(await validate(query)).toHaveLength(0);

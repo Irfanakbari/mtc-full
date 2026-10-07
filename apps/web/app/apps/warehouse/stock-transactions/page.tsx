@@ -113,7 +113,7 @@ export default function TransactionsPage() {
                 .filter((i) => i.IsActive)
                 .map((i) => ({
                   value: i.Id,
-                  label: `${i.ItemCode} — ${i.Name} (${i.AddressLocation})`,
+                  label: `${i.Name} — ${i.Model ?? "-"} (${i.AddressLocation})`,
                 }))}
             />
           </Form.Item>

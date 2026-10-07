@@ -336,7 +336,7 @@ export default function InventoryCountingPage() {
                     showSearch={{ optionFilterProp: "label" }}
                     options={items.map((i) => ({
                       value: i.Id,
-                      label: `${i.ItemCode} — ${i.Name}`,
+                      label: `${i.Name} — ${i.Model ?? "-"} (${i.AddressLocation})`,
                     }))}
                   />
                 </Form.Item>
@@ -475,7 +475,7 @@ export default function InventoryCountingPage() {
           dataSource={selected?.Details ?? []}
           scroll={{ x: 900 }}
           columns={[
-            { title: "Item Code", dataIndex: ["Item", "ItemCode"] },
+            { title: "Model", dataIndex: ["Item", "Model"] },
             { title: "Name", dataIndex: ["Item", "Name"] },
             { title: "Address", dataIndex: ["Item", "AddressLocation"] },
             { title: "System Qty", dataIndex: "SystemQty", align: "right" },

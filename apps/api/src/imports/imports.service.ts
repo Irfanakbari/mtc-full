@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { parse } from 'csv-parse/sync';
+import ExcelJS from 'exceljs';
 import { Prisma } from '../generated/prisma/client';
 import { InventoryTransactionType } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,51 +8,81 @@ import { claimCommand, finishCommand } from '../common/business-command';
 import { withSerializableInventory } from '../common/inventory-transaction';
 import { CommitImportDto, ImportItemRowDto } from './dto';
 
-const HEADER = 'itemCode,name,brand,model,serialNumber,unit,addressLocation,openingBalance,minimumStock,referenceDoc,notes\n';
+const HEADERS = ['name', 'model', 'specification', 'addressLocation', 'unit', 'openingBalance', 'minimumStock', 'referenceDoc', 'notes', 'classification'];
 
 @Injectable()
 export class ImportsService {
   constructor(private readonly prisma: PrismaService) {}
-  template(): Buffer { return Buffer.from(`${HEADER}MTC-001,Example Item,Example Brand,Model A,,PCS,A-01-01,10,2,OPENING-001,Initial stock\n`, 'utf8'); }
+  async template(): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Part Master', { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = HEADERS.map((header) => ({ header, key: header, width: header === 'specification' || header === 'notes' ? 45 : 24 }));
+    sheet.getRow(1).height = 26;
+    sheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17365D' } };
+      cell.note = ['name', 'addressLocation'].includes(cell.text)
+        ? 'Required. Enter one part per row. Location must be unique.'
+        : 'Optional. Unit defaults to PCS; opening balance and minimum stock default to 0. Use plain values, not formulas.';
+    });
+    for (const field of ['name', 'model', 'specification', 'addressLocation', 'unit', 'referenceDoc', 'notes', 'classification']) sheet.getColumn(field).numFmt = '@';
+    for (const field of ['openingBalance', 'minimumStock']) sheet.getColumn(field).numFmt = '0.00';
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
 
   async preview(file: Express.Multer.File) {
-    if (!file || file.size > 5 * 1024 * 1024) throw new BadRequestException('CSV file is required and must be no larger than 5 MB');
-    if (!file.originalname.toLowerCase().endsWith('.csv') || file.buffer.includes(0)) throw new BadRequestException('Only a valid text CSV file is allowed');
-    let records: Record<string, string>[];
-    try { records = parse(file.buffer, { columns: true, bom: true, skip_empty_lines: true, trim: true }) as Record<string, string>[]; }
-    catch { throw new BadRequestException('CSV file is malformed'); }
-    if (records.length > 5000) throw new BadRequestException('CSV import supports at most 5,000 rows');
+    if (!file || !file.buffer?.length || file.buffer.length > 5 * 1024 * 1024) throw new BadRequestException('XLSX file is required and must be no larger than 5 MB');
+    if (!file.originalname.toLowerCase().endsWith('.xlsx')) throw new BadRequestException('Only XLSX files are allowed');
+    const workbook = new ExcelJS.Workbook();
+    try { await workbook.xlsx.load(file.buffer as unknown as ExcelJS.Buffer); }
+    catch { throw new BadRequestException('XLSX file is malformed or unsupported'); }
+    const sheet = workbook.worksheets[0];
+    if (!sheet || sheet.rowCount < 2) throw new BadRequestException('Enter at least one part below the template headers');
+    if (sheet.rowCount > 5001) throw new BadRequestException('XLSX import supports at most 5,000 data rows');
+    const headers: string[] = [];
+    sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, column) => {
+      const header = cell.text.trim();
+      if (!HEADERS.includes(header) || headers.includes(header)) throw new BadRequestException('Invalid or duplicate column. Download the current XLSX template.');
+      headers[column - 1] = header;
+    });
+    if (!headers.includes('name') || !headers.includes('addressLocation')) throw new BadRequestException('The name and addressLocation columns are required');
+    const records: Array<{ rowNumber: number; values: Record<string, string> }> = [];
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const values: Record<string, string> = {};
+      row.eachCell((cell, column) => {
+        if (!headers[column - 1]) throw new BadRequestException(`Row ${rowNumber} has a value without a column header`);
+        if (typeof cell.value !== 'string' && typeof cell.value !== 'number' && cell.value !== null) throw new BadRequestException(`Row ${rowNumber}: use plain text or numbers, not formulas or other cell types`);
+        values[headers[column - 1]] = cell.text.trim();
+      });
+      if (Object.values(values).some(Boolean)) records.push({ rowNumber, values });
+    });
+    if (!records.length) throw new BadRequestException('Enter at least one part below the template headers');
     const rows: ImportItemRowDto[] = [];
     const errors: Array<{ rowNumber: number; field: string; message: string }> = [];
-    const codes = new Set<string>(); const addresses = new Set<string>(); const serials = new Set<string>();
+    const addresses = new Set<string>();
     const existing = await this.prisma.inventoryItem.findMany({
       where: {
         OR: [
-          { ItemCode: { in: records.map((r) => r.itemCode?.trim()).filter(Boolean) } },
-          { AddressLocation: { in: records.map((r) => r.addressLocation?.trim()).filter(Boolean) } },
-          { SerialNumber: { in: records.map((r) => r.serialNumber?.trim()).filter(Boolean) } },
+          { AddressLocation: { in: records.map((r) => r.values.addressLocation?.trim()).filter(Boolean) } },
         ],
       },
-      select: { ItemCode: true, AddressLocation: true, SerialNumber: true },
+      select: { AddressLocation: true },
     });
-    const existingCodes = new Set(existing.map((v) => v.ItemCode.toLowerCase()));
     const existingAddresses = new Set(existing.map((v) => v.AddressLocation.toLowerCase()));
-    const existingSerials = new Set(existing.map((v) => v.SerialNumber?.toLowerCase()).filter((s): s is string => Boolean(s)));
-    records.forEach((record, index) => {
-      const rowNumber = index + 2; const itemCode = record.itemCode?.trim(); const address = record.addressLocation?.trim(); const name = record.name?.trim();
-      const serial = record.serialNumber?.trim() || undefined;
+    records.forEach(({ rowNumber, values: record }) => {
+      const address = record.addressLocation?.trim(); const name = record.name?.trim();
       const opening = Number(record.openingBalance || 0); const minimum = Number(record.minimumStock || 0);
-      if (!itemCode) errors.push({ rowNumber, field: 'itemCode', message: 'Item code is required' });
+      for (const [field, max] of Object.entries({ name: 200, model: 120, specification: 1000, addressLocation: 120, unit: 30, referenceDoc: 160, notes: 1000 })) {
+        if ((record[field]?.trim().length ?? 0) > max) errors.push({ rowNumber, field, message: `Maximum length is ${max} characters` });
+      }
       if (!name) errors.push({ rowNumber, field: 'name', message: 'Name is required' });
       if (!address) errors.push({ rowNumber, field: 'addressLocation', message: 'Address location is required' });
       if (!Number.isFinite(opening) || opening < 0 || !/^\d+(\.\d{1,2})?$/.test(record.openingBalance || '0')) errors.push({ rowNumber, field: 'openingBalance', message: 'Opening balance must be a non-negative number with at most two decimals' });
       if (!Number.isFinite(minimum) || minimum < 0 || !/^\d+(\.\d{1,2})?$/.test(record.minimumStock || '0')) errors.push({ rowNumber, field: 'minimumStock', message: 'Minimum stock must be a non-negative number with at most two decimals' });
-      if (itemCode && (codes.has(itemCode.toLowerCase()) || existingCodes.has(itemCode.toLowerCase()))) errors.push({ rowNumber, field: 'itemCode', message: 'Item code is duplicated or already exists' });
       if (address && (addresses.has(address.toLowerCase()) || existingAddresses.has(address.toLowerCase()))) errors.push({ rowNumber, field: 'addressLocation', message: 'Address location is duplicated or already exists' });
-      if (serial && (serials.has(serial.toLowerCase()) || existingSerials.has(serial.toLowerCase()))) errors.push({ rowNumber, field: 'serialNumber', message: 'Serial number is duplicated or already exists' });
-      if (itemCode) codes.add(itemCode.toLowerCase()); if (address) addresses.add(address.toLowerCase());
-      if (serial) serials.add(serial.toLowerCase());
-      rows.push({ rowNumber, itemCode, name, brand: record.brand?.trim() || undefined, model: record.model?.trim() || undefined, serialNumber: serial, unit: record.unit?.trim() || 'PCS', addressLocation: address, openingBalance: opening, minimumStock: minimum, referenceDoc: record.referenceDoc?.trim() || undefined, notes: record.notes?.trim() || undefined });
+      if (address) addresses.add(address.toLowerCase());
+      rows.push({ rowNumber, name, model: record.model?.trim() || undefined, specification: record.specification?.trim() || undefined, classification: record.classification?.trim() || undefined, unit: record.unit?.trim() || 'PCS', addressLocation: address, openingBalance: opening, minimumStock: minimum, referenceDoc: record.referenceDoc?.trim() || undefined, notes: record.notes?.trim() || undefined });
     });
     return { valid: errors.length === 0, rows, errors, summary: { totalRows: rows.length, validRows: rows.length - new Set(errors.map((e) => e.rowNumber)).size, invalidRows: new Set(errors.map((e) => e.rowNumber)).size } };
   }
@@ -63,16 +93,15 @@ export class ImportsService {
     return withSerializableInventory(this.prisma, async (tx) => {
       const command = await claimCommand(tx, 'ITEM_IMPORT', key, actor.username, dto);
       if (command.replay) return command.replay;
-      const created: Array<{ id: string; itemCode: string; rowNumber: number }> = [];
+      const created: Array<{ id: string; name: string; rowNumber: number }> = [];
       for (const row of dto.rows) {
         const opening = new Prisma.Decimal(row.openingBalance);
         const item = await tx.inventoryItem.create({
           data: {
-            ItemCode: row.itemCode,
             Name: row.name,
-            Brand: row.brand?.trim() || null,
             Model: row.model?.trim() || null,
-            SerialNumber: row.serialNumber?.trim() || null,
+            Specification: row.specification?.trim() || null,
+            Classification: row.classification?.trim() || null,
             Unit: row.unit,
             AddressLocation: row.addressLocation,
             CurrentBalance: opening,
@@ -81,7 +110,7 @@ export class ImportsService {
           },
         });
         await tx.inventoryLedger.create({ data: { ItemId: item.Id, TransactionType: InventoryTransactionType.OPENING_BALANCE, ReferenceDoc: row.referenceDoc || `IMPORT-${key}`, BalanceBefore: 0, QtyIn: opening, QtyOut: 0, BalanceAfter: opening, CreatedBy: actor.username, Notes: row.notes, IdempotencyKey: `${key}:${row.rowNumber}` } });
-        created.push({ id: item.Id, itemCode: item.ItemCode, rowNumber: row.rowNumber });
+        created.push({ id: item.Id, name: item.Name, rowNumber: row.rowNumber });
       }
       const result = { imported: created.length, items: created };
       await finishCommand(tx, command.id, result);

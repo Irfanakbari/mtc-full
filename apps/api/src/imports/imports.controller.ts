@@ -10,7 +10,7 @@ import { ImportsService } from './imports.service';
 @ApiTags('Imports') @ApiBearerAuth() @Controller('imports/items')
 export class ImportsController {
   constructor(private readonly service: ImportsService) {}
-  @Get('template') @Permission('MTC.ITEM.IMPORT') @Header('Content-Type', 'text/csv; charset=utf-8') template(@Res({ passthrough: true }) response: Response) { response.setHeader('Content-Disposition', 'attachment; filename="mtc-item-import-template.csv"'); return new StreamableFile(this.service.template()); }
+  @Get('template') @Permission('MTC.ITEM.IMPORT') @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') async template(@Res({ passthrough: true }) response: Response) { response.setHeader('Content-Disposition', 'attachment; filename="mtc-part-master-template.xlsx"'); return new StreamableFile(await this.service.template()); }
   @Post('preview') @Permission('MTC.ITEM.IMPORT') @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } })) @ApiConsumes('multipart/form-data') preview(@UploadedFile() file: Express.Multer.File) { return this.service.preview(file); }
   @Post('commit') @Permission('MTC.ITEM.IMPORT') @ApiHeader({ name: 'Idempotency-Key', required: true }) commit(@Body() dto: CommitImportDto, @Headers('idempotency-key') key: string | undefined, @CurrentUser() user: CurrentUserIdentity) { return this.service.commit(dto, key, user); }
 }

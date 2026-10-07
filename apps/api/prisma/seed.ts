@@ -72,9 +72,8 @@ const readonlyActions = permissions
 
 const dummyItems = [
   {
-    itemCode: "MTC-DUMMY-001",
+    seedKey: "MTC-DUMMY-001",
     name: "Air Filter Element",
-    brand: "Denso",
     model: "AF-100",
     unit: "PCS",
     address: "DUMMY-A01-01",
@@ -82,9 +81,8 @@ const dummyItems = [
     minimumStock: "10.00",
   },
   {
-    itemCode: "MTC-DUMMY-002",
+    seedKey: "MTC-DUMMY-002",
     name: "Oil Filter Cartridge",
-    brand: "Sakura",
     model: "C-1104",
     unit: "PCS",
     address: "DUMMY-A01-02",
@@ -92,9 +90,8 @@ const dummyItems = [
     minimumStock: "8.00",
   },
   {
-    itemCode: "MTC-DUMMY-003",
+    seedKey: "MTC-DUMMY-003",
     name: "Spark Plug Iridium",
-    brand: "NGK",
     model: "IFR6T11",
     unit: "PCS",
     address: "DUMMY-A01-03",
@@ -102,9 +99,8 @@ const dummyItems = [
     minimumStock: "20.00",
   },
   {
-    itemCode: "MTC-DUMMY-004",
+    seedKey: "MTC-DUMMY-004",
     name: "Brake Pad Front Set",
-    brand: "Advics",
     model: "SN-135P",
     unit: "SET",
     address: "DUMMY-A02-01",
@@ -112,9 +108,8 @@ const dummyItems = [
     minimumStock: "6.00",
   },
   {
-    itemCode: "MTC-DUMMY-005",
+    seedKey: "MTC-DUMMY-005",
     name: "V-Belt",
-    brand: "Mitsuboshi",
     model: "7PK1935",
     unit: "PCS",
     address: "DUMMY-A02-02",
@@ -122,9 +117,8 @@ const dummyItems = [
     minimumStock: "5.00",
   },
   {
-    itemCode: "MTC-DUMMY-006",
+    seedKey: "MTC-DUMMY-006",
     name: "Headlamp Bulb",
-    brand: "Philips",
     model: "H11-12V55W",
     unit: "PCS",
     address: "DUMMY-A02-03",
@@ -132,9 +126,8 @@ const dummyItems = [
     minimumStock: "8.00",
   },
   {
-    itemCode: "MTC-DUMMY-007",
+    seedKey: "MTC-DUMMY-007",
     name: "Wiper Blade 24 Inch",
-    brand: "Bosch",
     model: "AP24U",
     unit: "PCS",
     address: "DUMMY-B01-01",
@@ -142,9 +135,8 @@ const dummyItems = [
     minimumStock: "5.00",
   },
   {
-    itemCode: "MTC-DUMMY-008",
+    seedKey: "MTC-DUMMY-008",
     name: "Coolant Long Life",
-    brand: "Toyota",
     model: "LLC-1L",
     unit: "BTL",
     address: "DUMMY-B01-02",
@@ -152,9 +144,8 @@ const dummyItems = [
     minimumStock: "10.00",
   },
   {
-    itemCode: "MTC-DUMMY-009",
+    seedKey: "MTC-DUMMY-009",
     name: "Workshop Cleaning Cloth",
-    brand: "Vuteq",
     model: "CLOTH-40",
     unit: "PCS",
     address: "DUMMY-B01-03",
@@ -162,9 +153,8 @@ const dummyItems = [
     minimumStock: "30.00",
   },
   {
-    itemCode: "MTC-DUMMY-010",
+    seedKey: "MTC-DUMMY-010",
     name: "Nitrile Safety Gloves",
-    brand: "Ansell",
     model: "EDGE-82-133",
     unit: "BOX",
     address: "DUMMY-B02-01",
@@ -291,16 +281,14 @@ async function main(): Promise<void> {
       let dummyItemCreatedCount = 0;
       for (const item of dummyItems) {
         const existingItem = await tx.inventoryItem.findUnique({
-          where: { ItemCode: item.itemCode },
+          where: { AddressLocation: item.address },
           select: { Id: true },
         });
         if (existingItem) continue;
 
         await tx.inventoryItem.create({
           data: {
-            ItemCode: item.itemCode,
             Name: item.name,
-            Brand: item.brand,
             Model: item.model,
             Unit: item.unit,
             AddressLocation: item.address,
@@ -310,14 +298,14 @@ async function main(): Promise<void> {
             LedgerEntries: {
               create: {
                 TransactionType: InventoryTransactionType.OPENING_BALANCE,
-                ReferenceDoc: `SEED-OPENING-${item.itemCode}`,
+                ReferenceDoc: `SEED-OPENING-${item.seedKey}`,
                 BalanceBefore: 0,
                 QtyIn: item.openingBalance,
                 QtyOut: 0,
                 BalanceAfter: item.openingBalance,
                 CreatedBy: SEED_ACTOR,
                 Notes: "Dummy opening balance for development and UAT",
-                IdempotencyKey: `seed:dummy:${item.itemCode}`,
+                IdempotencyKey: `seed:dummy:${item.seedKey}`,
               },
             },
           },
@@ -326,9 +314,9 @@ async function main(): Promise<void> {
       }
 
       const seededDummyItems = await tx.inventoryItem.findMany({
-        where: { ItemCode: { in: dummyItems.map((item) => item.itemCode) } },
+        where: { AddressLocation: { in: dummyItems.map((item) => item.address) } },
         select: {
-          ItemCode: true,
+          AddressLocation: true,
           CurrentBalance: true,
           LedgerEntries: { select: { QtyIn: true, QtyOut: true } },
         },
@@ -346,7 +334,7 @@ async function main(): Promise<void> {
         );
         if (Math.abs(Number(item.CurrentBalance) - ledgerBalance) > 0.001) {
           throw new Error(
-            `Ledger reconciliation failed for dummy item ${item.ItemCode}`,
+            `Ledger reconciliation failed for dummy item ${item.AddressLocation}`,
           );
         }
       }

@@ -14,9 +14,9 @@ export class InventoryItemsService {
   async create(dto: CreateInventoryItemDto, actor: CurrentUserIdentity) {
     return withSerializableInventory(this.prisma, async (tx) => {
       const opening = new Prisma.Decimal(dto.openingBalance ?? 0);
-      const item = await tx.inventoryItem.create({ data: { ItemCode: dto.itemCode, Name: dto.name, Brand: dto.brand?.trim() || null, Model: dto.model?.trim() || null, SerialNumber: dto.serialNumber?.trim() || null, Unit: dto.unit, AddressLocation: dto.addressLocation, MinimumStock: dto.minimumStock, CurrentBalance: opening, CreatedBy: actor.username } });
+      const item = await tx.inventoryItem.create({ data: { Name: dto.name, Model: dto.model?.trim() || null, Specification: dto.specification?.trim() || null, Classification: dto.classification?.trim() || null, Unit: dto.unit, AddressLocation: dto.addressLocation, MinimumStock: dto.minimumStock, CurrentBalance: opening, CreatedBy: actor.username } });
       if (dto.openingBalance !== undefined) {
-        await tx.inventoryLedger.create({ data: { ItemId: item.Id, TransactionType: InventoryTransactionType.OPENING_BALANCE, ReferenceDoc: dto.referenceDoc || `OPENING-${item.ItemCode}`, BalanceBefore: 0, QtyIn: opening, QtyOut: 0, BalanceAfter: opening, CreatedBy: actor.username, Notes: dto.notes } });
+        await tx.inventoryLedger.create({ data: { ItemId: item.Id, TransactionType: InventoryTransactionType.OPENING_BALANCE, ReferenceDoc: dto.referenceDoc || `OPENING-${item.Id}`, BalanceBefore: 0, QtyIn: opening, QtyOut: 0, BalanceAfter: opening, CreatedBy: actor.username, Notes: dto.notes } });
       }
       await tx.actionAuditEvent.create({ data: { EntityType: 'InventoryItem', EntityId: item.Id, Action: 'CREATE', Actor: actor.username, After: JSON.parse(JSON.stringify(item)) } });
       return item;
@@ -27,7 +27,7 @@ export class InventoryItemsService {
     const where: Prisma.InventoryItemWhereInput = {};
     if (query.active !== undefined) where.IsActive = query.active;
     if (query.address) where.AddressLocation = { contains: query.address, mode: 'insensitive' };
-    if (query.search) where.OR = ['ItemCode', 'Name', 'Brand', 'Model', 'SerialNumber', 'AddressLocation'].map((key) => ({ [key]: { contains: query.search, mode: 'insensitive' } })) as Prisma.InventoryItemWhereInput[];
+    if (query.search) where.OR = ['Name', 'Model', 'Specification', 'Classification', 'AddressLocation'].map((key) => ({ [key]: { contains: query.search, mode: 'insensitive' } })) as Prisma.InventoryItemWhereInput[];
     if (query.lowStock) where.CurrentBalance = { lte: this.prisma.inventoryItem.fields.MinimumStock };
     const skip = (query.page - 1) * query.limit;
     const [total, data] = await Promise.all([
@@ -54,11 +54,10 @@ export class InventoryItemsService {
     const updated = await this.prisma.inventoryItem.update({
       where: { Id: id },
       data: {
-        ItemCode: dto.itemCode,
         Name: dto.name,
-        Brand: dto.brand !== undefined ? (dto.brand?.trim() || null) : undefined,
         Model: dto.model !== undefined ? (dto.model?.trim() || null) : undefined,
-        SerialNumber: dto.serialNumber !== undefined ? (dto.serialNumber?.trim() || null) : undefined,
+        Specification: dto.specification !== undefined ? (dto.specification?.trim() || null) : undefined,
+        Classification: dto.classification !== undefined ? (dto.classification?.trim() || null) : undefined,
         Unit: dto.unit,
         AddressLocation: dto.addressLocation,
         MinimumStock: dto.minimumStock,
@@ -103,9 +102,9 @@ export class InventoryItemsService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Items', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.columns = [
-      { header: 'Item Code', key: 'code', width: 20 }, { header: 'Name', key: 'name', width: 35 }, { header: 'Brand', key: 'brand', width: 18 }, { header: 'Model', key: 'model', width: 18 }, { header: 'Serial Number', key: 'serial', width: 22 }, { header: 'Unit', key: 'unit', width: 10 }, { header: 'Address Location', key: 'address', width: 22 }, { header: 'Current Balance', key: 'balance', width: 18 }, { header: 'Minimum Stock', key: 'minimum', width: 18 }, { header: 'Status', key: 'status', width: 12 },
+      { header: 'Name', key: 'name', width: 35 }, { header: 'Model', key: 'model', width: 18 }, { header: 'Specification', key: 'specification', width: 40 }, { header: 'Classification', key: 'classification', width: 24 }, { header: 'Unit', key: 'unit', width: 10 }, { header: 'Address Location', key: 'address', width: 22 }, { header: 'Current Balance', key: 'balance', width: 18 }, { header: 'Minimum Stock', key: 'minimum', width: 18 }, { header: 'Status', key: 'status', width: 12 },
     ];
-    for (const item of rows) sheet.addRow({ code: item.ItemCode, name: item.Name, brand: item.Brand, model: item.Model, serial: item.SerialNumber, unit: item.Unit, address: item.AddressLocation, balance: Number(item.CurrentBalance), minimum: Number(item.MinimumStock), status: item.IsActive ? 'Active' : 'Archived' });
+    for (const item of rows) sheet.addRow({ name: item.Name, model: item.Model, specification: item.Specification, classification: item.Classification, unit: item.Unit, address: item.AddressLocation, balance: Number(item.CurrentBalance), minimum: Number(item.MinimumStock), status: item.IsActive ? 'Active' : 'Archived' });
     const output = await workbook.xlsx.writeBuffer();
     return Buffer.from(output);
   }

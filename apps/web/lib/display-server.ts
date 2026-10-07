@@ -38,11 +38,7 @@ export function displayApiFetch(path: string, init: RequestInit = {}): Promise<R
   return fetch(`${getApiUrl()}${path}`, { ...init, headers, cache: "no-store" });
 }
 
-export function isSameOriginMutation(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  return origin === new URL(request.url).origin;
-}
+export { isSameOriginMutation } from "./mutation-origin";
 
 export function allowDisplayMutation(request: Request): boolean {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();

@@ -25,7 +25,6 @@ import {
 } from "antd";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import { useVuteqSso } from "@vuteq/sso-client-react/react";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import ButtonToolbar from "@/components/ButtonToolbar";
@@ -36,6 +35,7 @@ import {
   commitImport,
   createItem,
   exportItems,
+  downloadImportTemplate,
   fetchItems,
   previewImport,
   reactivateItem,
@@ -66,6 +66,7 @@ export default function ItemsPage() {
     rows: Record<string, unknown>[];
     errors: Array<{ rowNumber: number; field: string; message: string }>;
   } | null>(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [importing, setImporting] = useState(false);
   const searchRef = useRef<InputRef>(null);
   const permissions = session?.permissions ?? [];
@@ -139,11 +140,10 @@ export default function ItemsPage() {
   const openEdit = () => {
     if (!selected) return;
     form.setFieldsValue({
-      itemCode: selected.ItemCode,
       name: selected.Name,
-      brand: selected.Brand ?? undefined,
       model: selected.Model ?? undefined,
-      serialNumber: selected.SerialNumber ?? undefined,
+      specification: selected.Specification ?? undefined,
+      classification: selected.Classification ?? undefined,
       unit: selected.Unit,
       addressLocation: selected.AddressLocation,
       minimumStock: Number(selected.MinimumStock),
@@ -195,7 +195,18 @@ export default function ItemsPage() {
       },
     });
   };
+  const downloadTemplate = async () => {
+    setDownloadingTemplate(true);
+    try { await dispatch(downloadImportTemplate()).unwrap(); }
+    catch (e) { message.error(e instanceof Error ? e.message : String(e)); }
+    finally { setDownloadingTemplate(false); }
+  };
   const handleFile = async (file: File) => {
+    setPreview(null);
+    if (!file.name.toLowerCase().endsWith('.xlsx') || file.size > 5 * 1024 * 1024) {
+      message.error('Select an XLSX file no larger than 5 MB');
+      return Upload.LIST_IGNORE;
+    }
     setImporting(true);
     try {
       const result = await dispatch(previewImport(file)).unwrap();
@@ -271,7 +282,7 @@ export default function ItemsPage() {
           }}
         />
         <ButtonToolbar
-          title="Import CSV"
+          title="Import XLSX"
           icon={<ImportOutlined />}
           enable={can(permissions, "MTC.ITEM.IMPORT", roles)}
           onClick={() => setImportOpen(true)}
@@ -310,35 +321,13 @@ export default function ItemsPage() {
           scroll={{ x: "max-content", y: "calc(100vh - 380px)" }}
           style={{ fontSize: 11 }}
           columns={[
-            {
-              title: "Item Code",
-              dataIndex: "ItemCode",
-              fixed: "left",
-              ...filterProps("item code"),
-            },
-            {
-              title: "Status",
-              dataIndex: "IsActive",
-              render: (v) => (
-                <Tag color={v ? "success" : "default"}>
-                  {v ? "Active" : "Archived"}
-                </Tag>
-              ),
-            },
+            { title: "Address Location", dataIndex: "AddressLocation", fixed: "left", ...filterProps("address") },
             { title: "Name", dataIndex: "Name", ...filterProps("name") },
-            { title: "Brand", dataIndex: "Brand", render: (v) => v || "-" },
             { title: "Model", dataIndex: "Model", render: (v) => v || "-" },
-            {
-              title: "Serial Number",
-              dataIndex: "SerialNumber",
-              render: (v) => v || "-",
-            },
+            { title: "Specification", dataIndex: "Specification", render: (v) => v || "-" },
+            { title: "Classification", dataIndex: "Classification", render: (v) => v || "-", ...filterProps("classification") },
             { title: "Unit", dataIndex: "Unit" },
-            {
-              title: "Address Location",
-              dataIndex: "AddressLocation",
-              ...filterProps("address"),
-            },
+            { title: "Status", dataIndex: "IsActive", render: (v) => <Tag color={v ? "success" : "default"}>{v ? "Active" : "Archived"}</Tag> },
             {
               title: "Balance",
               dataIndex: "CurrentBalance",
@@ -384,26 +373,19 @@ export default function ItemsPage() {
         <Form form={form} layout="vertical">
           <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
             <Form.Item
-              name="itemCode"
-              label="Item Code"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
               name="name"
               label="Item Name"
               rules={[{ required: true }]}
             >
               <Input />
             </Form.Item>
-            <Form.Item name="brand" label="Brand">
-              <Input />
-            </Form.Item>
             <Form.Item name="model" label="Model">
               <Input />
             </Form.Item>
-            <Form.Item name="serialNumber" label="Serial Number">
+            <Form.Item name="specification" label="Specification">
+              <Input.TextArea maxLength={1000} rows={3} />
+            </Form.Item>
+            <Form.Item name="classification" label="Classification">
               <Input />
             </Form.Item>
             <Form.Item name="unit" label="Unit" rules={[{ required: true }]}>
@@ -451,16 +433,17 @@ export default function ItemsPage() {
         }}
         onOk={commit}
         okText="Commit Import"
-        okButtonProps={{ disabled: !preview?.valid }}
+        okButtonProps={{ disabled: importing || !preview?.valid }}
         confirmLoading={importing}
         width={800}
       >
         <Space orientation="vertical" className="w-full">
-          <Link href="/api/proxy/v1/imports/items/template">
-            Download CSV template
-          </Link>
-          <Upload accept=".csv,text/csv" maxCount={1} beforeUpload={handleFile}>
-            <Button icon={<ImportOutlined />}>Select CSV file</Button>
+          <Button icon={<DownloadOutlined />} loading={downloadingTemplate} onClick={() => void downloadTemplate()}>
+            Download XLSX Template
+          </Button>
+          <span>Fill in the template, then upload an XLSX file (maximum 5 MB, 5,000 rows).</span>
+          <Upload accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" maxCount={1} disabled={importing} beforeUpload={handleFile} onRemove={() => setPreview(null)}>
+            <Button icon={<ImportOutlined />} disabled={importing}>Select XLSX File</Button>
           </Upload>
           {preview && (
             <>

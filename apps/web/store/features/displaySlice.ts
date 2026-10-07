@@ -3,9 +3,9 @@ import { displayApi } from "../utils/display-api";
 
 export interface DisplayItem {
   Id: string;
-  ItemCode: string;
   Name: string;
-  SerialNumber?: string | null;
+  Model?: string | null;
+  Specification?: string | null;
   Unit: string;
   AddressLocation: string;
   CurrentBalance: string;
@@ -21,7 +21,7 @@ export interface DisplayTransactionInput {
 export interface DisplayReceipt {
   ledgerId?: string;
   transactionDate?: string;
-  itemCode?: string;
+  addressLocation?: string;
   itemName?: string;
   unit?: string;
   balanceAfter?: string;
