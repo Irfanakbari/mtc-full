@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { clearDisplayError, clearDisplayItem, lookupDisplayItem, resetDisplayReceipt, submitDisplayTransaction, type DisplayTransactionInput } from "@/store/features/displaySlice";
 import type { AppDispatch, RootState } from "@/store/store";
 import { withBasePath } from "@/lib/base-path";
+import { isValidDisplayQuantity, stockShortage } from "@/lib/display-quantity";
 import styles from "./scanner-display.module.css";
 import routeStyles from "./display.module.css";
 
@@ -21,8 +22,12 @@ export default function ScannerDisplay() {
   const partInput = useRef<InputRef>(null);
   const operatorInput = useRef<InputRef>(null);
   const pendingCommand = useRef<{ signature: string; key: string } | null>(null);
+  const quantity = Form.useWatch("quantity", form);
   const direction = Form.useWatch("direction", form) ?? "IN";
   const { selectedItem, loadingItems, submitting, error, receipt } = useSelector((state: RootState) => state.display);
+
+  const shortage = stockShortage(direction, quantity, selectedItem?.CurrentBalance, selectedItem?.Unit);
+  const submitBlocked = !selectedItem || submitting || !!shortage || !isValidDisplayQuantity(quantity);
 
   useEffect(() => { partInput.current?.focus({ cursor: "all" }); }, []);
 
@@ -79,6 +84,11 @@ export default function ScannerDisplay() {
       partInput.current?.focus({ cursor: "all" });
       return;
     }
+    const stockError = stockShortage(values.direction, values.quantity, selectedItem.CurrentBalance, selectedItem.Unit);
+    if (stockError || !isValidDisplayQuantity(values.quantity)) {
+      form.setFields([{ name: "quantity", errors: [stockError ?? "Enter a positive quantity with no more than two decimals"] }]);
+      return;
+    }
     dispatch(clearDisplayError());
     const input: DisplayTransactionInput = { direction: values.direction, itemId: selectedItem.Id, quantity: values.quantity, operatorName: values.operatorName.trim().replace(/\s+/g, " ") };
     const signature = JSON.stringify(input);
@@ -92,6 +102,10 @@ export default function ScannerDisplay() {
       message.success("Stock transaction recorded");
     } catch (submitError) {
       message.error(typeof submitError === "string" ? submitError : "Transaction failed");
+      if (typeof submitError === "string" && submitError.startsWith("Insufficient stock")) {
+        try { await dispatch(lookupDisplayItem(selectedItem.AddressLocation)).unwrap(); }
+        catch { /* A failed refresh clears the selected item and blocks submit. */ }
+      }
       operatorInput.current?.focus({ cursor: "end" });
     }
   }
@@ -129,16 +143,18 @@ export default function ScannerDisplay() {
 
             {selectedItem && <div className={styles.partCard} aria-live="polite"><CheckCircleFilled /><div className={styles.partIdentity}><span>{selectedItem.Model ?? "Part"}</span><strong>{selectedItem.Name}</strong><span>{selectedItem.Specification}</span></div><div><span>Location</span><strong>{selectedItem.AddressLocation}</strong></div><div><span>Balance</span><strong>{selectedItem.CurrentBalance} {selectedItem.Unit}</strong></div></div>}
 
+            {shortage && <Alert className={styles.alert} type="warning" showIcon title={shortage} role="alert" />}
+
             <div className={styles.entryGrid}>
-              <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: "Enter quantity" }, { validator: async (_, value) => { if (direction === "OUT" && selectedItem && Number(value) > Number(selectedItem.CurrentBalance)) throw new Error("Quantity exceeds current balance"); } }]}>
-                <InputNumber id="display-quantity" className="w-full" suffix={selectedItem?.Unit ?? "Unit"} min={0.01} max={direction === "OUT" && selectedItem ? Number(selectedItem.CurrentBalance) : Number.MAX_SAFE_INTEGER} precision={2} step={1} prefix={<InboxOutlined />} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); operatorInput.current?.focus({ cursor: "all" }); }} />
+              <Form.Item name="quantity" label="Quantity" dependencies={["direction"]} rules={[{ validator: async (_, value) => { const stockError = stockShortage(form.getFieldValue("direction"), value, selectedItem?.CurrentBalance, selectedItem?.Unit); if (stockError) throw new Error(stockError); if (!isValidDisplayQuantity(value)) throw new Error("Enter a positive quantity with no more than two decimals"); } }]}>
+                <InputNumber id="display-quantity" className="w-full" suffix={selectedItem?.Unit ?? "Unit"} min={0.01} max={Number.MAX_SAFE_INTEGER} precision={2} step={1} prefix={<InboxOutlined />} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); operatorInput.current?.focus({ cursor: "all" }); }} />
               </Form.Item>
               <Form.Item name="operatorName" label="Operator Name" rules={[{ required: true, whitespace: true, message: "Enter operator name" }, { pattern: /^[\p{L}\p{N} .'-]{2,80}$/u, message: "Enter a valid operator name" }]}>
                 <Input ref={operatorInput} allowClear prefix={<UserOutlined />} suffix={<span className={styles.enterHint}>Enter to submit ↵</span>} placeholder="Type operator name" maxLength={80} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); form.submit(); }} />
               </Form.Item>
             </div>
 
-            <Button block type="primary" danger={direction === "OUT"} htmlType="submit" loading={submitting} disabled={!selectedItem || submitting} icon={direction === "IN" ? <ArrowDownOutlined /> : <ArrowUpOutlined />} className={`${styles.submitButton} ${direction === "IN" ? styles.inButton : ""}`}>Submit Stock {direction === "IN" ? "In" : "Out"}</Button>
+            <Button block type="primary" danger={direction === "OUT"} htmlType="submit" loading={submitting} disabled={submitBlocked} icon={direction === "IN" ? <ArrowDownOutlined /> : <ArrowUpOutlined />} className={`${styles.submitButton} ${direction === "IN" ? styles.inButton : ""}`}>Submit Stock {direction === "IN" ? "In" : "Out"}</Button>
           </Form>
         </Card>
         <footer className={styles.footer}><span>Ledger-backed inventory · Every movement is auditable</span><Link href="/auth/login">Administrative access</Link></footer>

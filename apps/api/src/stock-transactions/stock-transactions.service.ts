@@ -32,7 +32,7 @@ export class StockTransactionsService {
       const quantity = new Prisma.Decimal(dto.quantity);
       const isIn = type === InventoryTransactionType.STOCK_IN;
       const after = isIn ? item.CurrentBalance.add(quantity) : item.CurrentBalance.sub(quantity);
-      if (after.lessThan(0)) throw new ConflictException('Insufficient stock');
+      if (after.lessThan(0)) throw new ConflictException(`Insufficient stock: available stock ${item.CurrentBalance.toString()} ${item.Unit} is less than the required quantity ${quantity.toString()} ${item.Unit}.`);
       const ledger = await tx.inventoryLedger.create({ data: { ItemId: item.Id, TransactionType: type, ReferenceDoc: dto.referenceDoc, BalanceBefore: item.CurrentBalance, QtyIn: isIn ? quantity : 0, QtyOut: isIn ? 0 : quantity, BalanceAfter: after, CreatedBy: actor.username, Notes: dto.notes, IdempotencyKey: idempotencyKey } });
       await tx.inventoryItem.update({ where: { Id: item.Id }, data: { CurrentBalance: after, UpdatedBy: actor.username } });
       const result = { ledger, item: { ...item, CurrentBalance: after } };

@@ -1,3 +1,4 @@
+import { isValidDisplayQuantity } from "@/lib/display-quantity";
 import {
   allowDisplayMutation,
   displayApiFetch,
@@ -54,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!body || (body.direction !== "IN" && body.direction !== "OUT")) return invalid("Select Stock In or Stock Out");
   if (typeof body.operatorName !== "string" || !OPERATOR_NAME.test(body.operatorName.trim())) return invalid("Enter a valid operator name");
   if (typeof body.itemId !== "string" || !UUID.test(body.itemId)) return invalid("Select a valid inventory item");
-  if (typeof body.quantity !== "number" || !Number.isFinite(body.quantity) || body.quantity <= 0 || Math.abs(body.quantity * 100 - Math.round(body.quantity * 100)) > 1e-8) return invalid("Quantity must be positive with no more than two decimals");
+  if (!isValidDisplayQuantity(body.quantity)) return invalid("Quantity must be positive with no more than two decimals");
   const idempotencyKey = request.headers.get("idempotency-key");
   if (!idempotencyKey || !IDEMPOTENCY_KEY.test(idempotencyKey)) return invalid("A valid transaction request ID is required");
   if (!allowDisplayMutation(request)) {
