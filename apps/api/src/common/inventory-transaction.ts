@@ -8,10 +8,10 @@ export async function lockInventoryItem(tx: TransactionClient, itemId: string): 
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${itemId}))`;
 }
 
-export async function withSerializableInventory<T>(prisma: PrismaService, operation: (tx: TransactionClient) => Promise<T>): Promise<T> {
+export async function withSerializableInventory<T>(prisma: PrismaService, operation: (tx: TransactionClient) => Promise<T>, options: { timeout?: number; maxWait?: number } = {}): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      return await prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return await prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, ...options });
     } catch (error) {
       const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
       if (!retryable || attempt === 3) {

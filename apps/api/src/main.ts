@@ -3,10 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import type { Request, Response, NextFunction } from 'express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  app.useBodyParser('json', { limit: '10mb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '100kb' });
   const config = app.get(ConfigService);
   app.use(helmet());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
@@ -19,7 +23,7 @@ async function bootstrap(): Promise<void> {
   if (swaggerEnabled) {
     const document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('MTC Inventory API').setDescription('Inventory, ledger, stock opname, and IAM API').setVersion('1.0').addBearerAuth().addApiKey({ type: 'apiKey', in: 'header', name: 'X-Api-Key' }, 'api-key').build());
     const key = config.get<string>('SWAGGER_API_KEY');
-    instance.use('/api/docs', (req: { headers: Record<string, string> }, res: { status: (code: number) => { json: (value: unknown) => void } }, next: () => void) => { if (!key || req.headers['x-docs-api-key'] === key) next(); else res.status(401).json({ message: 'Documentation authentication failed' }); });
+    instance.use('/api/docs', (req: Request, res: Response, next: NextFunction) => { if (!key || req.headers['x-docs-api-key'] === key) next(); else res.status(401).json({ message: 'Documentation authentication failed' }); });
     SwaggerModule.setup('api/docs', app, document, { jsonDocumentUrl: 'api/docs-json' });
   }
   const port = config.get<number>('PORT', 31000);

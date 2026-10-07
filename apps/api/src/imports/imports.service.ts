@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client';
 import { InventoryTransactionType } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
@@ -64,7 +65,7 @@ export class ImportsService {
     const existing = await this.prisma.inventoryItem.findMany({
       where: {
         OR: [
-          { AddressLocation: { in: records.map((r) => r.values.addressLocation?.trim()).filter(Boolean) } },
+          { AddressLocation: { in: records.map((r) => r.values.addressLocation?.trim()).filter(Boolean), mode: 'insensitive' } },
         ],
       },
       select: { AddressLocation: true },
@@ -87,34 +88,52 @@ export class ImportsService {
     return { valid: errors.length === 0, rows, errors, summary: { totalRows: rows.length, validRows: rows.length - new Set(errors.map((e) => e.rowNumber)).size, invalidRows: new Set(errors.map((e) => e.rowNumber)).size } };
   }
 
-  commit(dto: CommitImportDto, key: string | undefined, actor: CurrentUserIdentity) {
+  async commit(dto: CommitImportDto, key: string | undefined, actor: CurrentUserIdentity) {
     if (!key || !/^[A-Za-z0-9._:-]{8,80}$/.test(key)) throw new BadRequestException('A valid Idempotency-Key header is required');
     if (!dto.rows.length || dto.rows.length > 5000) throw new BadRequestException('Import must contain between 1 and 5,000 rows');
-    return withSerializableInventory(this.prisma, async (tx) => {
-      const command = await claimCommand(tx, 'ITEM_IMPORT', key, actor.username, dto);
-      if (command.replay) return command.replay;
-      const created: Array<{ id: string; name: string; rowNumber: number }> = [];
-      for (const row of dto.rows) {
-        const opening = new Prisma.Decimal(row.openingBalance);
-        const item = await tx.inventoryItem.create({
-          data: {
-            Name: row.name,
-            Model: row.model?.trim() || null,
-            Specification: row.specification?.trim() || null,
-            Classification: row.classification?.trim() || null,
-            Unit: row.unit,
-            AddressLocation: row.addressLocation,
-            CurrentBalance: opening,
-            MinimumStock: row.minimumStock,
-            CreatedBy: actor.username,
-          },
-        });
-        await tx.inventoryLedger.create({ data: { ItemId: item.Id, TransactionType: InventoryTransactionType.OPENING_BALANCE, ReferenceDoc: row.referenceDoc || `IMPORT-${key}`, BalanceBefore: 0, QtyIn: opening, QtyOut: 0, BalanceAfter: opening, CreatedBy: actor.username, Notes: row.notes, IdempotencyKey: `${key}:${row.rowNumber}` } });
-        created.push({ id: item.Id, name: item.Name, rowNumber: row.rowNumber });
-      }
-      const result = { imported: created.length, items: created };
-      await finishCommand(tx, command.id, result);
-      return result;
+    const locations = new Set<string>();
+    const rowNumbers = new Set<number>();
+    const rows = dto.rows.map(row => {
+      const addressLocation = row.addressLocation.trim();
+      if (!row.name.trim() || !addressLocation || !row.unit.trim()) throw new BadRequestException(`Row ${row.rowNumber}: name, location, and unit are required`);
+      if (locations.has(addressLocation.toLowerCase())) throw new BadRequestException(`Row ${row.rowNumber}: address location is duplicated`);
+      if (rowNumbers.has(row.rowNumber)) throw new BadRequestException(`Row ${row.rowNumber}: duplicate row number`);
+      locations.add(addressLocation.toLowerCase());
+      rowNumbers.add(row.rowNumber);
+      return { ...row, addressLocation, name: row.name.trim(), unit: row.unit.trim() };
     });
+    try {
+      return await withSerializableInventory(this.prisma, async (tx) => {
+        const command = await claimCommand(tx, 'ITEM_IMPORT', key, actor.username, dto);
+        if (command.replay) return command.replay;
+        const existing = await tx.inventoryItem.findMany({ where: { AddressLocation: { in: rows.map(row => row.addressLocation), mode: 'insensitive' } }, select: { AddressLocation: true } });
+        if (existing.length) throw new ConflictException('One or more locations already exist. Preview the file again before importing.');
+        const created = rows.map(row => ({ id: randomUUID(), name: row.name, rowNumber: row.rowNumber }));
+        // Keep the entire file atomic, but avoid two database round trips per row.
+        for (let offset = 0; offset < rows.length; offset += 250) {
+          const batch = rows.slice(offset, offset + 250);
+          await tx.inventoryItem.createMany({ data: batch.map((row, index) => ({
+            Id: created[offset + index].id, Name: row.name, Model: row.model?.trim() || null,
+            Specification: row.specification?.trim() || null, Classification: row.classification?.trim() || null,
+            Unit: row.unit, AddressLocation: row.addressLocation, CurrentBalance: new Prisma.Decimal(row.openingBalance),
+            MinimumStock: row.minimumStock, CreatedBy: actor.username,
+          })) });
+          await tx.inventoryLedger.createMany({ data: batch.map((row, index) => ({
+            ItemId: created[offset + index].id, TransactionType: InventoryTransactionType.OPENING_BALANCE,
+            ReferenceDoc: row.referenceDoc || `IMPORT-${key}`, BalanceBefore: 0,
+            QtyIn: new Prisma.Decimal(row.openingBalance), QtyOut: 0, BalanceAfter: new Prisma.Decimal(row.openingBalance),
+            CreatedBy: actor.username, Notes: row.notes,
+            IdempotencyKey: createHash('sha256').update(`${key}:${row.rowNumber}`).digest('hex'),
+          })) });
+        }
+        const result = { imported: created.length, items: created };
+        await finishCommand(tx, command.id, result);
+        return result;
+      }, { timeout: 60_000, maxWait: 10_000 });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException('A location was imported by another request. Preview the file again.');
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2028') throw new ConflictException('Import transaction timed out and was rolled back. Retry the import.');
+      throw error;
+    }
   }
 }

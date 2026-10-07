@@ -68,6 +68,7 @@ export default function ItemsPage() {
   } | null>(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [importing, setImporting] = useState(false);
+  const importKey = useRef<string | null>(null);
   const searchRef = useRef<InputRef>(null);
   const permissions = session?.permissions ?? [];
   const roles = session?.roles ?? [];
@@ -203,6 +204,7 @@ export default function ItemsPage() {
   };
   const handleFile = async (file: File) => {
     setPreview(null);
+    importKey.current = null;
     if (!file.name.toLowerCase().endsWith('.xlsx') || file.size > 5 * 1024 * 1024) {
       message.error('Select an XLSX file no larger than 5 MB');
       return Upload.LIST_IGNORE;
@@ -211,6 +213,7 @@ export default function ItemsPage() {
     try {
       const result = await dispatch(previewImport(file)).unwrap();
       setPreview(result.data);
+      importKey.current = crypto.randomUUID();
       message[result.data.valid ? "success" : "warning"](
         result.data.valid
           ? "Import file is valid"
@@ -227,7 +230,7 @@ export default function ItemsPage() {
     if (!preview?.valid) return;
     setImporting(true);
     try {
-      const result = await dispatch(commitImport(preview.rows)).unwrap();
+      const result = await dispatch(commitImport({ rows: preview.rows, idempotencyKey: importKey.current ?? (importKey.current = crypto.randomUUID()) })).unwrap();
       message.success(`${result.data.imported} item(s) imported`);
       setImportOpen(false);
       setPreview(null);
@@ -428,6 +431,7 @@ export default function ItemsPage() {
         centered
         destroyOnHidden
         onCancel={() => {
+          if (importing) return;
           setImportOpen(false);
           setPreview(null);
         }}
@@ -435,7 +439,7 @@ export default function ItemsPage() {
         okText="Commit Import"
         okButtonProps={{ disabled: importing || !preview?.valid }}
         confirmLoading={importing}
-        width={800}
+        width={1100}
       >
         <Space orientation="vertical" className="w-full">
           <Button icon={<DownloadOutlined />} loading={downloadingTemplate} onClick={() => void downloadTemplate()}>
@@ -458,6 +462,26 @@ export default function ItemsPage() {
               )}
               <Table
                 size="small"
+                rowKey="rowNumber"
+                dataSource={preview.rows}
+                pagination={{ pageSize: 10, showSizeChanger: false, showTotal: total => `${total} rows` }}
+                scroll={{ x: 1200 }}
+                columns={[
+                  { title: "Row", dataIndex: "rowNumber", width: 65 },
+                  { title: "Address Location", dataIndex: "addressLocation" },
+                  { title: "Name", dataIndex: "name" },
+                  { title: "Model", dataIndex: "model" },
+                  { title: "Specification", dataIndex: "specification" },
+                  { title: "Classification", dataIndex: "classification" },
+                  { title: "Unit", dataIndex: "unit" },
+                  { title: "Opening Balance", dataIndex: "openingBalance" },
+                  { title: "Minimum Stock", dataIndex: "minimumStock" },
+                  { title: "Reference", dataIndex: "referenceDoc" },
+                  { title: "Notes", dataIndex: "notes" },
+                ]}
+              />
+              {preview.errors.length > 0 && <Table
+                size="small"
                 rowKey={(r) => `${r.rowNumber}-${r.field}`}
                 pagination={{ pageSize: 8 }}
                 dataSource={preview.errors}
@@ -466,7 +490,7 @@ export default function ItemsPage() {
                   { title: "Field", dataIndex: "field" },
                   { title: "Message", dataIndex: "message" },
                 ]}
-              />
+              />}
             </>
           )}
         </Space>
