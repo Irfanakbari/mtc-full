@@ -35,7 +35,7 @@ export default function SystemLogPage() {
           placeholder="Search function or actor"
           className="max-w-sm"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           onSearch={() => {
             setPage(1);
             refresh();
@@ -98,7 +98,7 @@ export default function SystemLogPage() {
             },
             {
               title: "Actor",
-              dataIndex: "Actor",
+              dataIndex: "ActorDisplayName",
               render: (v) => v || "System",
             },
             {
