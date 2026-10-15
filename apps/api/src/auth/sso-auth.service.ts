@@ -51,7 +51,10 @@ export class SsoAuthService implements OnModuleInit {
     return {
       roles: user.Role ? [user.Role.Name] : [],
       permissions: user.Role?.Permissions.map((p) => p.Action) ?? [],
-      attributes: { applicationUserId: user.Id },
+      attributes: {
+        applicationUserId: user.Id,
+        accessStatus: user.RoleId === null ? 'PENDING' : 'ACTIVE',
+      },
     };
   }
 

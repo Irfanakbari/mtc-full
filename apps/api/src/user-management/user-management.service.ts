@@ -8,7 +8,13 @@ import { CreateApiKeyDto, CreatePermissionDto, CreateRoleDto, UpdateRoleDto, Upd
 @Injectable()
 export class UserManagementService {
   constructor(private readonly prisma: PrismaService) {}
-  users() { return this.prisma.appUser.findMany({ include: { Role: true }, orderBy: { Name: 'asc' } }); }
+  async users() {
+    const list = await this.prisma.appUser.findMany({ include: { Role: true }, orderBy: { Name: 'asc' } });
+    return list.map((user) => ({
+      ...user,
+      AccessStatus: user.RoleId === null ? 'PENDING' : 'ACTIVE',
+    }));
+  }
   async updateUser(id: string, dto: UpdateUserDto, actor: CurrentUserIdentity) { const user = await this.prisma.appUser.findUnique({ where: { Id: id } }); if (!user) throw new NotFoundException('User not found'); if (user.SsoObjectId === actor.username && dto.isActive === false) throw new ConflictException('You cannot deactivate your own account'); return this.prisma.appUser.update({ where: { Id: id }, data: { RoleId: dto.roleId, IsActive: dto.isActive, UpdatedBy: actor.username }, include: { Role: true } }); }
   roles() { return this.prisma.appRole.findMany({ include: { Permissions: true, _count: { select: { Users: true } } }, orderBy: { Name: 'asc' } }); }
   createRole(dto: CreateRoleDto, actor: CurrentUserIdentity) { return this.prisma.appRole.create({ data: { Name: dto.name.toUpperCase(), Description: dto.description, CreatedBy: actor.username, Permissions: { connect: dto.permissionIds.map((Id) => ({ Id })) } }, include: { Permissions: true } }); }

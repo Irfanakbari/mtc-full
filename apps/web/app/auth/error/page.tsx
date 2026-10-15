@@ -1,15 +1,17 @@
-'use client';
+/*By Irfan Akbari Vuteq Indonesia - 2026-09-15*/
 
 import { Button, Result } from 'antd';
 import { withBasePath } from '@/lib/base-path';
 
-export default function AuthError() {
+export default function SsoErrorPage() {
   return (
-    <Result
-      status="error"
-      title="Sign-in failed"
-      subTitle="Vuteq SSO could not complete the sign-in request. Please try again or contact support."
-      extra={<Button type="primary" href={withBasePath('/auth/login')}>Try again</Button>}
-    />
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <Result
+        status="error"
+        title="Sign-in failed"
+        subTitle="MTC could not complete your Vuteq SSO sign-in. Please try again."
+        extra={<Button type="primary" href={withBasePath('/auth/login')}>Try again</Button>}
+      />
+    </main>
   );
 }

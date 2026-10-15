@@ -3,7 +3,7 @@ import { api, type ApiEnvelope, type Pagination } from '../utils/api';
 
 export interface PermissionRecord { Id: string; Action: string; Description: string | null }
 export interface RoleRecord { Id: string; Name: string; Description: string | null; IsSystem: boolean; Permissions: PermissionRecord[]; _count: { Users: number } }
-export interface UserRecord { Id: string; Name: string; Email: string; IsActive: boolean; RoleId: string | null; Role: RoleRecord | null; LastLogin: string | null }
+export interface UserRecord { Id: string; Name: string; Email: string; IsActive: boolean; RoleId: string | null; Role: RoleRecord | null; LastLogin: string | null; AccessStatus?: 'ACTIVE' | 'PENDING' }
 export interface ApiKeyRecord { Id: string; Name: string; Prefix: string; IsActive: boolean; Permissions: string[]; ExpiresAt: string | null; LastUsedAt: string | null; CreatedAt: string }
 export interface ProcessLogRecord { Id: string; FunctionId: string; FunctionName: string; Status: string; Actor: string | null; ActorDisplayName: string; StartedAt: string; CompletedAt: string | null; Message: string | null; Details: { Id: string; Level: string; Message: string; CreatedAt: string }[] }
 

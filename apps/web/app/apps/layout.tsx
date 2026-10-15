@@ -29,9 +29,10 @@ import {
 } from "antd";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { withBasePath, withoutBasePath } from "@/lib/base-path";
+import type { MTCUser } from "@/types/auth";
 import CreditInformationModal from "./_components/CreditInformationModal";
 import PrivacyPolicyModal from "./_components/PrivacyPolicyModal";
 import UpdateLogModal from "./_components/UpdateLogModal";
@@ -118,12 +119,27 @@ export default function AppsLayout({ children }: { children: React.ReactNode }) 
   const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
   const [updateLogOpen, setUpdateLogOpen] = useState(false);
   const { session, loading } = useVuteqSso();
+  const router = useRouter();
   const pathname = withoutBasePath(usePathname());
   const { modal } = App.useApp();
 
   useEffect(() => {
-    if (!loading && !session) window.location.replace(withBasePath("/auth/login"));
-  }, [loading, session]);
+    if (loading) return;
+    if (!session) {
+      window.location.replace(withBasePath("/auth/login"));
+      return;
+    }
+    const profile = session.attributes as Partial<MTCUser> | undefined;
+    const isGlobalSuper = session.globalRoles?.includes("SUPER_ADMINISTRATOR");
+    if (!isGlobalSuper && (profile?.AccessStatus === "PENDING" || !profile?.RoleName)) {
+      router.replace("/auth/pending-account");
+      return;
+    }
+    if (!isGlobalSuper && profile?.AccessStatus && profile.AccessStatus !== "ACTIVE") {
+      router.replace("/auth/error");
+      return;
+    }
+  }, [loading, router, session]);
 
   const permissions = useMemo(() => session?.permissions ?? [], [session?.permissions]);
   const superUser = Boolean(
@@ -159,6 +175,18 @@ export default function AppsLayout({ children }: { children: React.ReactNode }) 
         <Brand />
         <Spin size="large" />
         <div>Checking your Vuteq account session...</div>
+      </div>
+    );
+  }
+
+  const profile = session.attributes as Partial<MTCUser> | undefined;
+  const isGlobalSuper = session.globalRoles?.includes("SUPER_ADMINISTRATOR");
+  if (!isGlobalSuper && (profile?.AccessStatus === "PENDING" || !profile?.RoleName)) {
+    return (
+      <div className="mtc-session-loader">
+        <Brand />
+        <Spin size="large" />
+        <div>Checking account approval...</div>
       </div>
     );
   }
