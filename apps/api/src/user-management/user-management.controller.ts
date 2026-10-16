@@ -10,6 +10,7 @@ export class UserManagementController {
   constructor(private readonly service: UserManagementService) {}
   @Get('users') @Permission('MTC.USER_MANAGEMENT') users() { return this.service.users(); }
   @Patch('users/:id') @Permission('MTC.USER_MANAGEMENT') updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto, @CurrentUser() user: CurrentUserIdentity) { return this.service.updateUser(id, dto, user); }
+  @Delete('users/:id') @Permission('MTC.USER_MANAGEMENT') deleteUser(@Param('id') id: string, @CurrentUser() user: CurrentUserIdentity) { return this.service.deleteUser(id, user); }
   @Get('roles') @Permission('MTC.ROLE_MANAGEMENT') roles() { return this.service.roles(); }
   @Post('roles') @Permission('MTC.ROLE_MANAGEMENT') createRole(@Body() dto: CreateRoleDto, @CurrentUser() user: CurrentUserIdentity) { return this.service.createRole(dto, user); }
   @Patch('roles/:id') @Permission('MTC.ROLE_MANAGEMENT') updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto, @CurrentUser() user: CurrentUserIdentity) { return this.service.updateRole(id, dto, user); }
