@@ -36,17 +36,57 @@ export class SsoAuthService implements OnModuleInit {
   }
 
   private async resolveAuthorization(identity: VuteqIdentity) {
-    const email = identity.email ?? `${identity.id}@sso.invalid`;
+    const email = identity.email ? identity.email.trim().toLowerCase() : `${identity.id}@sso.invalid`;
     const name = identity.name ?? identity.username ?? identity.id;
-    const bySubject = await this.prisma.appUser.findUnique({ where: { SsoObjectId: identity.id } });
-    const byEmail = bySubject ? null : await this.prisma.appUser.findUnique({ where: { Email: email } });
-    const existing = bySubject ?? byEmail;
-    const bootstrapRole = !existing && this.bootstrapAdminEmail === email.toLowerCase()
+    const actor = identity.id;
+
+    // 1. Primary lookup by immutable SSO Subject
+    let existing = await this.prisma.appUser.findUnique({
+      where: { SsoObjectId: identity.id },
+      include: { Role: { include: { Permissions: true } } },
+    });
+
+    // 2. Safe Fallback: lookup by Email only if user is not found and email is a valid real email
+    if (!existing && identity.email) {
+      const byEmail = await this.prisma.appUser.findUnique({
+        where: { Email: email },
+        include: { Role: { include: { Permissions: true } } },
+      });
+      // Only link if the existing record doesn't already have a different SsoObjectId
+      if (byEmail && (!byEmail.SsoObjectId || byEmail.SsoObjectId === identity.id)) {
+        existing = byEmail;
+      }
+    }
+
+    const bootstrapRole = !existing && this.bootstrapAdminEmail && this.bootstrapAdminEmail === email
       ? await this.prisma.appRole.findUnique({ where: { Name: 'SUPER' } })
       : null;
+
     const user = existing
-      ? await this.prisma.appUser.update({ where: { Id: existing.Id }, data: { SsoObjectId: identity.id, Email: email, Name: name, LastLogin: new Date() }, include: { Role: { include: { Permissions: true } } } })
-      : await this.prisma.appUser.create({ data: { SsoObjectId: identity.id, Email: email, Name: name, CreatedBy: identity.id, LastLogin: new Date(), RoleId: bootstrapRole?.Id }, include: { Role: { include: { Permissions: true } } } });
+      ? await this.prisma.appUser.update({
+          where: { Id: existing.Id },
+          data: {
+            SsoObjectId: identity.id,
+            Email: email,
+            Name: name,
+            LastLogin: new Date(),
+            UpdatedBy: actor,
+          },
+          include: { Role: { include: { Permissions: true } } },
+        })
+      : await this.prisma.appUser.create({
+          data: {
+            SsoObjectId: identity.id,
+            Email: email,
+            Name: name,
+            CreatedBy: actor,
+            UpdatedBy: actor,
+            LastLogin: new Date(),
+            RoleId: bootstrapRole?.Id ?? null,
+          },
+          include: { Role: { include: { Permissions: true } } },
+        });
+
     if (!user.IsActive) throw new Error('User account is inactive');
     return {
       roles: user.Role ? [user.Role.Name] : [],

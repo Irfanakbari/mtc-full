@@ -2,6 +2,7 @@
 
 export interface MTCUser {
   Id?: string;
+  SsoObjectId?: string;
   UserId?: string;
   Name?: string;
   Email?: string | null;
@@ -12,3 +13,4 @@ export interface MTCUser {
   AccessStatus?: 'ACTIVE' | 'PENDING' | 'BLOCKED' | 'UNAVAILABLE';
   GlobalRoles?: string[];
 }
+
