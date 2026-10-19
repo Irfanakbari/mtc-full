@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { displayApi } from "../utils/display-api";
 
 export interface DisplayItem {
@@ -59,6 +59,10 @@ const slice = createSlice({
     resetDisplayReceipt(state) { state.receipt = null; state.error = null; },
     clearDisplayError(state) { state.error = null; },
     clearDisplayItem(state) { state.selectedItem = null; state.error = null; },
+    setSelectedItem(state, action: PayloadAction<DisplayItem>) {
+      state.selectedItem = action.payload;
+      state.error = null;
+    },
   },
   extraReducers(builder) {
     builder
@@ -71,5 +75,5 @@ const slice = createSlice({
   },
 });
 
-export const { resetDisplayReceipt, clearDisplayError, clearDisplayItem } = slice.actions;
+export const { resetDisplayReceipt, clearDisplayError, clearDisplayItem, setSelectedItem } = slice.actions;
 export default slice.reducer;

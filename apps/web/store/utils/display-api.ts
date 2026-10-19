@@ -19,6 +19,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const displayApi = {
   lookup: (partNumber: string) => request<{ data: import("../features/displaySlice").DisplayItem }>(`${withBasePath("/api/display/items")}?partNumber=${encodeURIComponent(partNumber)}`),
+  search: (query: string) => request<{ data: import("../features/displaySlice").DisplayItem[] }>(`${withBasePath("/api/display/items")}?search=${encodeURIComponent(query)}`),
   transact: (input: import("../features/displaySlice").DisplayTransactionInput, idempotencyKey: string) => request<{ data: import("../features/displaySlice").DisplayReceipt }>(withBasePath("/api/display/transactions"), {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },

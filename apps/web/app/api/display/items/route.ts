@@ -14,7 +14,37 @@ interface ApiItem {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-  const scanned = new URL(request.url).searchParams.get("partNumber")?.trim() ?? "";
+  const url = new URL(request.url);
+  const search = url.searchParams.get("search")?.trim() || url.searchParams.get("q")?.trim();
+  const scanned = url.searchParams.get("partNumber")?.trim() ?? "";
+
+  if (search) {
+    if (search.length > 120) return Response.json({ message: "Search query is too long" }, { status: 400 });
+    try {
+      const response = await displayApiFetch(`/items?search=${encodeURIComponent(search)}&active=true&limit=50`);
+      const payload = (await response.json().catch(() => null)) as { data?: ApiItem[]; message?: string } | null;
+      if (!response.ok) {
+        const status = response.status === 401 || response.status === 403 ? 503 : response.status;
+        return Response.json({ message: status === 503 ? "Operator display is not configured" : payload?.message ?? "Unable to search inventory items" }, { status });
+      }
+      const rawItems = payload?.data ?? [];
+      const items = rawItems
+        .filter((item) => item.IsActive)
+        .map(({ Id, Name, Model, Specification, Unit, AddressLocation, CurrentBalance }) => ({
+          Id,
+          Name,
+          Model,
+          Specification,
+          Unit,
+          AddressLocation,
+          CurrentBalance,
+        }));
+      return Response.json({ data: items }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      return displayErrorResponse(error);
+    }
+  }
+
   if (!scanned || scanned.length > 120) return Response.json({ message: "Scan or enter a valid rack location" }, { status: 400 });
   try {
     const response = await displayApiFetch(`/items/address/${encodeURIComponent(scanned)}`);
