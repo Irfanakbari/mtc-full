@@ -1,7 +1,16 @@
 import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { VuteqSsoService, type VuteqAuthContext, type VuteqIdentity } from '@vuteq/sso-client-nest';
+import { VuteqSsoService, type VuteqAccessClaims, type VuteqAuthContext, type VuteqIdentity } from '@vuteq/sso-client-nest';
 import { PrismaService } from '../prisma/prisma.service';
+
+const DEFAULT_READONLY_PERMISSIONS = [
+  'MTC.DASHBOARD.READ',
+  'MTC.ITEM.READ',
+  'MTC.ITEM.EXPORT',
+  'MTC.STOCK.READ',
+  'MTC.OPNAME.READ',
+  'MTC.SYSTEM_LOG_READ',
+];
 
 @Injectable()
 export class SsoAuthService implements OnModuleInit {
@@ -19,7 +28,7 @@ export class SsoAuthService implements OnModuleInit {
         secret: config.get<string>('VUTEQ_SSO_SECRET') ?? '',
         allowedClientIds: (config.get<string>('VUTEQ_SSO_ALLOWED_CLIENT_IDS') ?? '').split(',').map((v) => v.trim()).filter(Boolean),
         global: false,
-        resolveAuthorization: (identity) => this.resolveAuthorization(identity),
+        resolveAuthorization: (identity, claims) => this.resolveAuthorization(identity, claims),
       });
     } catch (error) { this.logUnavailable(error); }
   }
@@ -35,7 +44,7 @@ export class SsoAuthService implements OnModuleInit {
     return this.service.authenticate(authorization);
   }
 
-  private async resolveAuthorization(identity: VuteqIdentity) {
+  private async resolveAuthorization(identity: VuteqIdentity, claims?: VuteqAccessClaims) {
     const email = identity.email ? identity.email.trim().toLowerCase() : `${identity.id}@sso.invalid`;
     const name = identity.name ?? identity.username ?? identity.id;
     const actor = identity.id;
@@ -88,12 +97,29 @@ export class SsoAuthService implements OnModuleInit {
         });
 
     if (!user.IsActive) throw new Error('User account is inactive');
+
+    const isRoAdmin = claims?.roles?.includes('RO_ADMINISTRATOR') ?? false;
+    let effectiveRoles = user.Role ? [user.Role.Name] : [];
+    let effectivePermissions = user.Role?.Permissions.map((p) => p.Action) ?? [];
+
+    if (isRoAdmin) {
+      const readonlyRole = await this.prisma.appRole.findUnique({
+        where: { Name: 'READONLY' },
+        include: { Permissions: true },
+      });
+      const readonlyPermissions = readonlyRole?.Permissions.map((p) => p.Action) ?? DEFAULT_READONLY_PERMISSIONS;
+      effectivePermissions = Array.from(new Set([...effectivePermissions, ...readonlyPermissions]));
+      if (effectiveRoles.length === 0) {
+        effectiveRoles = ['READONLY'];
+      }
+    }
+
     return {
-      roles: user.Role ? [user.Role.Name] : [],
-      permissions: user.Role?.Permissions.map((p) => p.Action) ?? [],
+      roles: effectiveRoles,
+      permissions: effectivePermissions,
       attributes: {
         applicationUserId: user.Id,
-        accessStatus: user.RoleId === null ? 'PENDING' : 'ACTIVE',
+        accessStatus: user.RoleId === null && !isRoAdmin ? 'PENDING' : 'ACTIVE',
       },
     };
   }

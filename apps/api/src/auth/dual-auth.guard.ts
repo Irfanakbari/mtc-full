@@ -34,8 +34,18 @@ export class DualAuthGuard implements CanActivate {
     if (!user) throw new UnauthorizedException('Invalid authentication credentials');
     request.user = user;
     const required = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]) ?? [];
-    const bypass = user.globalRoles?.includes('SUPER_ADMINISTRATOR') || user.roleName === 'SUPER' || user.permissions.includes('SUPER');
-    if (!bypass && required.some((permission) => !user!.permissions.includes(permission))) throw new ForbiddenException('Insufficient permission');
+    const isSuper = user.globalRoles?.includes('SUPER_ADMINISTRATOR') || user.roleName === 'SUPER' || user.permissions.includes('SUPER');
+    const isRoAdmin = user.globalRoles?.includes('RO_ADMINISTRATOR') || user.roleName === 'READONLY';
+    if (isRoAdmin && !user.roleName) {
+      user.roleName = 'READONLY';
+    }
+    const isReadOnlyPermission = (permission: string) =>
+      permission.endsWith('.READ') || permission.endsWith('_READ') || permission === 'MTC.ITEM.EXPORT';
+    const hasReadOnlyAuthority = isRoAdmin && required.length > 0 && required.every(isReadOnlyPermission);
+
+    if (!isSuper && !hasReadOnlyAuthority && required.some((permission) => !user!.permissions.includes(permission))) {
+      throw new ForbiddenException('Insufficient permission');
+    }
     return true;
   }
 }

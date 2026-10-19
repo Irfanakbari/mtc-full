@@ -11,5 +11,5 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
   @Get('profile')
   @ApiOperation({ summary: 'Get current application profile' })
-  profile(@CurrentUser() user: CurrentUserIdentity) { return this.auth.profile(user.username); }
+  profile(@CurrentUser() user: CurrentUserIdentity) { return this.auth.profile(user.username, user.globalRoles); }
 }
