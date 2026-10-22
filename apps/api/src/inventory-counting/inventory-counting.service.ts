@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CurrentUserIdentity } from '../auth/current-user.interface';
 import { lockInventoryItem, withSerializableInventory } from '../common/inventory-transaction';
 import { ApproveOpnameDto, BatchCountDto, CountItemDto, CreateOpnameDto, OpnameQueryDto } from './dto';
+import { buildInventoryCountingWorksheet, type WorksheetRowData } from './inventory-counting-worksheet.builder';
 
 @Injectable()
 export class InventoryCountingService {
@@ -91,6 +92,206 @@ export class InventoryCountingService {
     });
   }
 
+  async importCounts(id: string, file: Express.Multer.File, actor: CurrentUserIdentity) {
+    if (!file || !file.buffer?.length) throw new BadRequestException('Excel file is required');
+    if (file.buffer.length > 5 * 1024 * 1024) throw new BadRequestException('File size must not exceed 5 MB');
+
+    const workbook = new ExcelJS.Workbook();
+    try {
+      await workbook.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
+    } catch {
+      throw new BadRequestException('File is not a valid Excel (.xlsx) file');
+    }
+
+    const sheet = workbook.worksheets[0];
+    if (!sheet || sheet.rowCount < 1) throw new BadRequestException('The uploaded worksheet contains no data');
+
+    const parsedRows: Array<{ rowNumber: number; addressLocation: string; actualQty: number }> = [];
+    const errors: string[] = [];
+
+    sheet.eachRow((row, rowNumber) => {
+      const rawColA = row.getCell(1).text?.trim();
+      const rawColBValue = row.getCell(2).value;
+      const rawColBText = row.getCell(2).text?.trim();
+
+      if (rowNumber === 1) {
+        const aLower = (rawColA ?? '').toLowerCase();
+        const bLower = (rawColBText ?? '').toLowerCase();
+        if (
+          aLower.includes('address') ||
+          aLower.includes('lokasi') ||
+          aLower.includes('location') ||
+          aLower.includes('rak') ||
+          bLower.includes('qty') ||
+          bLower.includes('actual') ||
+          bLower.includes('aktual') ||
+          bLower.includes('fisik') ||
+          bLower.includes('hasil') ||
+          (rawColBValue === null || isNaN(Number(rawColBText.replace(/,/g, ''))))
+        ) {
+          return;
+        }
+      }
+
+      if (!rawColA) return;
+
+      let actualQtyNum: number;
+      if (typeof rawColBValue === 'number') {
+        actualQtyNum = rawColBValue;
+      } else if (
+        rawColBValue &&
+        typeof rawColBValue === 'object' &&
+        'result' in rawColBValue &&
+        typeof (rawColBValue as { result: unknown }).result === 'number'
+      ) {
+        actualQtyNum = (rawColBValue as { result: number }).result;
+      } else if (rawColBText !== '' && rawColBText !== undefined) {
+        const clean = rawColBText.replace(/,/g, '');
+        actualQtyNum = Number(clean);
+      } else {
+        return;
+      }
+
+      if (isNaN(actualQtyNum) || actualQtyNum < 0) {
+        errors.push(`Row ${rowNumber}: Invalid quantity "${rawColBText}" for location "${rawColA}"`);
+        return;
+      }
+
+      parsedRows.push({
+        rowNumber,
+        addressLocation: rawColA,
+        actualQty: actualQtyNum,
+      });
+    });
+
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.slice(0, 5).join('; ') + (errors.length > 5 ? `; and ${errors.length - 5} more error(s)` : ''));
+    }
+
+    if (parsedRows.length === 0) {
+      throw new BadRequestException('No valid data rows found in the uploaded file. Ensure Column A is Address Location and Column B is Actual Qty.');
+    }
+
+    return withSerializableInventory(this.prisma, async (tx) => {
+      const session = await tx.stockOpname.findUnique({
+        where: { Id: id },
+        include: {
+          Details: {
+            include: { Item: true },
+          },
+        },
+      });
+
+      if (!session) throw new NotFoundException('Inventory counting session not found');
+      if (session.Status !== OpnameStatus.IN_PROGRESS) {
+        throw new ConflictException('Counts can only be imported while inventory counting is IN_PROGRESS');
+      }
+
+      const detailByLocation = new Map<string, typeof session.Details[0]>();
+      for (const d of session.Details) {
+        detailByLocation.set(d.Item.AddressLocation.toLowerCase().trim(), d);
+      }
+
+      let updatedCount = 0;
+      const unmatchedLocations: string[] = [];
+      const now = new Date();
+
+      for (const row of parsedRows) {
+        const match = detailByLocation.get(row.addressLocation.toLowerCase().trim());
+        if (!match) {
+          unmatchedLocations.push(row.addressLocation);
+          continue;
+        }
+
+        const actual = new Prisma.Decimal(row.actualQty);
+        await tx.stockOpnameDetail.update({
+          where: { Id: match.Id },
+          data: {
+            ActualQty: actual,
+            DifferenceQty: actual.sub(match.SystemQty),
+            CountedAt: now,
+            CountedBy: actor.username,
+          },
+        });
+        updatedCount += 1;
+      }
+
+      return {
+        totalRows: parsedRows.length,
+        updatedCount,
+        unmatchedLocations,
+      };
+    });
+  }
+
+  async importTemplate(id: string): Promise<Buffer> {
+    const session = await this.detail(id);
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('STO Import', {
+      views: [{ state: 'frozen', ySplit: 1, showGridLines: true }],
+    });
+
+    sheet.columns = [
+      { header: 'Address Location', key: 'address', width: 22 },
+      { header: 'Hasil Aktual Qty', key: 'actual', width: 18 },
+      { header: 'Nama Barang (Ref)', key: 'name', width: 34 },
+      { header: 'Satuan (Ref)', key: 'unit', width: 10 },
+      { header: 'Qty Sistem (Ref)', key: 'system', width: 14 },
+    ];
+
+    const headerRow = sheet.getRow(1);
+    headerRow.height = 26;
+    headerRow.eachCell((cell, colNumber) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: colNumber <= 2 ? 'FF1E3A8A' : 'FF475569' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+
+    const items = session.Details.length > 0
+      ? session.Details.map((d) => ({
+          address: d.Item.AddressLocation,
+          name: d.Item.Name,
+          unit: d.Item.Unit,
+          system: Number(d.SystemQty),
+          actual: d.ActualQty !== null ? Number(d.ActualQty) : '',
+        }))
+      : (session.Selections.length > 0
+          ? session.Selections.map((s) => ({
+              address: s.Item.AddressLocation,
+              name: s.Item.Name,
+              unit: s.Item.Unit,
+              system: Number(s.Item.CurrentBalance),
+              actual: '',
+            }))
+          : []);
+
+    items.sort((a, b) => a.address.localeCompare(b.address));
+
+    for (const item of items) {
+      const row = sheet.addRow({
+        address: item.address,
+        actual: item.actual,
+        name: item.name,
+        unit: item.unit,
+        system: item.system,
+      });
+      row.height = 20;
+      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'right' };
+      row.getCell(2).numFmt = '#,##0.00';
+      row.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
+      row.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(5).alignment = { vertical: 'middle', horizontal: 'right' };
+      row.getCell(5).numFmt = '#,##0.00';
+    }
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
   approve(id: string, dto: ApproveOpnameDto, actor: CurrentUserIdentity) {
     if (!dto.confirmedCheck) throw new BadRequestException('Approver must confirm physical counts and discrepancies');
     return withSerializableInventory(this.prisma, async (tx) => {
@@ -131,11 +332,58 @@ export class InventoryCountingService {
   }
 
   async worksheet(id: string): Promise<Buffer> {
-    const session = await this.detail(id); const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('Stock Opname', { views: [{ state: 'frozen', ySplit: 4 }] });
-    sheet.addRow(['MTC Inventory Counting Worksheet']); sheet.addRow(['Record Number', session.RecordNumber]); sheet.addRow(['Status', session.Status]); sheet.addRow([]);
-    sheet.addRow(['No', 'Item Name', 'Model', 'Specification', 'Address', 'Unit', 'System Qty', 'Actual Qty', 'Difference', 'Notes']);
-    session.Details.forEach((detail, index) => sheet.addRow([index + 1, detail.Item.Name, detail.Item.Model, detail.Item.Specification, detail.Item.AddressLocation, detail.Item.Unit, Number(detail.SystemQty), detail.ActualQty === null ? '' : Number(detail.ActualQty), detail.DifferenceQty === null ? '' : Number(detail.DifferenceQty), detail.Notes ?? '']));
-    return Buffer.from(await workbook.xlsx.writeBuffer());
+    const session = await this.detail(id);
+    let rows: WorksheetRowData[];
+
+    if (session.Details && session.Details.length > 0) {
+      const sorted = [...session.Details].sort((a, b) => {
+        const locCompare = (a.Item.AddressLocation ?? '').localeCompare(b.Item.AddressLocation ?? '');
+        if (locCompare !== 0) return locCompare;
+        return a.Item.Name.localeCompare(b.Item.Name);
+      });
+      rows = sorted.map((d) => ({
+        item: d.Item,
+        systemQty: d.SystemQty,
+        actualQty: d.ActualQty,
+        differenceQty: d.DifferenceQty,
+        notes: d.Notes,
+      }));
+    } else {
+      let items: Array<{
+        Name: string;
+        Model: string | null;
+        Specification: string | null;
+        Classification: string | null;
+        Unit: string;
+        AddressLocation: string;
+        CurrentBalance: Prisma.Decimal;
+      }> = [];
+
+      if (session.Scope === OpnameScope.ALL_ACTIVE_ITEMS) {
+        items = await this.prisma.inventoryItem.findMany({
+          where: { IsActive: true },
+          orderBy: [{ AddressLocation: 'asc' }, { Name: 'asc' }],
+        });
+      } else {
+        const selectedIds = session.Selections.map((s) => s.ItemId);
+        if (selectedIds.length > 0) {
+          items = await this.prisma.inventoryItem.findMany({
+            where: { Id: { in: selectedIds } },
+            orderBy: [{ AddressLocation: 'asc' }, { Name: 'asc' }],
+          });
+        }
+      }
+
+      rows = items.map((item) => ({
+        item,
+        systemQty: item.CurrentBalance,
+        actualQty: null,
+        differenceQty: null,
+        notes: null,
+      }));
+    }
+
+    return buildInventoryCountingWorksheet(session, rows);
   }
 
   async finalReport(id: string): Promise<Buffer> {

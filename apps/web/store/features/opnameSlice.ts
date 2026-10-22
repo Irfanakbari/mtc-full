@@ -173,6 +173,39 @@ export const uploadOpnameAttachment = createAsyncThunk(
     catch (e) { return rejectWithValue(msg(e)); }
   },
 );
+export interface ImportCountsResult {
+  totalRows: number;
+  updatedCount: number;
+  unmatchedLocations: string[];
+}
+export const importOpnameCounts = createAsyncThunk(
+  "opname/importCounts",
+  async ({ id, file }: { id: string; file: File }, { rejectWithValue }) => {
+    try {
+      const data = new FormData();
+      data.append("file", file);
+      return await api.upload<ApiEnvelope<ImportCountsResult>>(
+        `/inventory-counting/${id}/import`,
+        data,
+      );
+    } catch (e) {
+      return rejectWithValue(msg(e));
+    }
+  },
+);
+export const downloadOpnameTemplate = createAsyncThunk(
+  "opname/downloadTemplate",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      saveBlob(
+        await api.blob(`/inventory-counting/${id}/import-template`),
+        `template-sto-${id}.xlsx`,
+      );
+    } catch (e) {
+      return rejectWithValue(msg(e));
+    }
+  },
+);
 export const downloadOpnameAttachment = createAsyncThunk(
   "opname/downloadAttachment",
   async ({ id, attachment }: { id: string; attachment: OpnameAttachment }, { rejectWithValue }) => {

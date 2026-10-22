@@ -11,6 +11,7 @@ import {
   ReloadOutlined,
   SaveOutlined,
   PaperClipOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   App,
@@ -41,9 +42,11 @@ import {
   createOpname,
   downloadOpname,
   downloadOpnameAttachment,
+  downloadOpnameTemplate,
   deleteOpnameAttachment,
   fetchOpname,
   fetchOpnames,
+  importOpnameCounts,
   saveCounts,
   startOpname,
   uploadOpnameAttachment,
@@ -203,6 +206,11 @@ export default function InventoryCountingPage() {
                 key: "worksheet",
                 label: "Download Worksheet",
                 onClick: () => selected && void dispatch(downloadOpname({ id: selected.Id, type: "worksheet" })),
+              },
+              {
+                key: "template",
+                label: "Download Import Template",
+                onClick: () => selected && void dispatch(downloadOpnameTemplate(selected.Id)),
               },
               {
                 key: "report",
@@ -381,6 +389,42 @@ export default function InventoryCountingPage() {
               >
                 Save Counts
               </Button>
+              <Upload
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                maxCount={1}
+                showUploadList={false}
+                disabled={!has("MTC.OPNAME.UPDATE")}
+                beforeUpload={async (file) => {
+                  try {
+                    const res = await dispatch(
+                      importOpnameCounts({ id: selected.Id, file }),
+                    ).unwrap();
+                    const info = res.data;
+                    if (info.unmatchedLocations?.length) {
+                      message.warning(
+                        `Imported ${info.updatedCount} items. ${info.unmatchedLocations.length} location(s) not matched in this session: ${info.unmatchedLocations.slice(0, 3).join(", ")}${info.unmatchedLocations.length > 3 ? "..." : ""}`,
+                      );
+                    } else {
+                      message.success(
+                        `Successfully imported ${info.updatedCount} actual count(s)`,
+                      );
+                    }
+                    await loadDetail(selected.Id);
+                    refresh();
+                  } catch (e) {
+                    message.error(e instanceof Error ? e.message : String(e));
+                  }
+                  return false;
+                }}
+              >
+                <Button
+                  icon={<UploadOutlined />}
+                  disabled={!has("MTC.OPNAME.UPDATE")}
+                  loading={saving}
+                >
+                  Import Counts
+                </Button>
+              </Upload>
               <Button
                 type="primary"
                 icon={<CheckOutlined />}
@@ -420,6 +464,15 @@ export default function InventoryCountingPage() {
             }
           >
             Worksheet
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() =>
+              selected &&
+              void dispatch(downloadOpnameTemplate(selected.Id))
+            }
+          >
+            Import Template
           </Button>
           {selected?.Status === "COMPLETED" && (
             <Button
