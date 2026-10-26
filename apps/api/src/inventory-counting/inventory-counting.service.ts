@@ -298,7 +298,6 @@ export class InventoryCountingService {
       const session = await tx.stockOpname.findUnique({ where: { Id: id }, include: { Details: true } });
       if (!session) throw new NotFoundException('Inventory counting session not found');
       if (session.Status !== OpnameStatus.IN_PROGRESS) throw new ConflictException('Only IN_PROGRESS inventory counting can be approved');
-      if (session.CreatedBy === actor.username || session.Details.some((d) => d.CountedBy === actor.username)) throw new ConflictException('Maker-checker rule: creator or counter cannot approve this session');
       const incomplete = session.Details.filter((d) => d.ActualQty === null);
       if (incomplete.length) throw new ConflictException(`${incomplete.length} item(s) have not been counted`);
       for (const detail of session.Details) {
