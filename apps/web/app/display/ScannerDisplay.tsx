@@ -10,7 +10,7 @@ import { clearDisplayError, clearDisplayItem, lookupDisplayItem, resetDisplayRec
 import { displayApi } from "@/store/utils/display-api";
 import type { AppDispatch, RootState } from "@/store/store";
 import { withBasePath } from "@/lib/base-path";
-import { isValidDisplayQuantity, stockShortage } from "@/lib/display-quantity";
+import { formatDisplayQuantity, isValidDisplayQuantity, stockShortage } from "@/lib/display-quantity";
 import styles from "./scanner-display.module.css";
 import routeStyles from "./display.module.css";
 
@@ -205,7 +205,7 @@ export default function ScannerDisplay() {
     }
     const stockError = stockShortage(values.direction, values.quantity, selectedItem.CurrentBalance, selectedItem.Unit);
     if (stockError || !isValidDisplayQuantity(values.quantity)) {
-      form.setFields([{ name: "quantity", errors: [stockError ?? "Enter a positive quantity with no more than two decimals"] }]);
+      form.setFields([{ name: "quantity", errors: [stockError ?? "Enter a positive whole number"] }]);
       return;
     }
     dispatch(clearDisplayError());
@@ -238,7 +238,7 @@ export default function ScannerDisplay() {
               status="success"
               icon={<CheckCircleFilled className={styles.successIcon} />}
               title={`Stock ${receipt.direction === "IN" ? "In" : "Out"} Recorded`}
-              subTitle={`${receipt.addressLocation} · ${receipt.quantity} ${receipt.unit} · New balance ${receipt.balanceAfter} ${receipt.unit}`}
+              subTitle={`${receipt.addressLocation} · ${formatDisplayQuantity(receipt.quantity)} ${receipt.unit} · New balance ${formatDisplayQuantity(receipt.balanceAfter)} ${receipt.unit}`}
               extra={
                 <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
                   <Button type="primary" size="large" onClick={startAnother}>
@@ -324,13 +324,13 @@ export default function ScannerDisplay() {
               />
             </Form.Item>
 
-            {selectedItem && <div className={styles.partCard} aria-live="polite"><CheckCircleFilled /><div className={styles.partIdentity}><span>{selectedItem.Model ?? "Part"}</span><strong>{selectedItem.Name}</strong><span>{selectedItem.Specification}</span></div><div><span>Location</span><strong>{selectedItem.AddressLocation}</strong></div><div><span>Balance</span><strong>{selectedItem.CurrentBalance} {selectedItem.Unit}</strong></div></div>}
+            {selectedItem && <div className={styles.partCard} aria-live="polite"><CheckCircleFilled /><div className={styles.partIdentity}><span>{selectedItem.Model ?? "Part"}</span><strong>{selectedItem.Name}</strong><span>{selectedItem.Specification}</span></div><div><span>Location</span><strong>{selectedItem.AddressLocation}</strong></div><div><span>Balance</span><strong>{formatDisplayQuantity(selectedItem.CurrentBalance)} {selectedItem.Unit}</strong></div></div>}
 
             {shortage && <Alert className={styles.alert} type="warning" showIcon title={shortage} role="alert" />}
 
             <div className={styles.entryGrid}>
-              <Form.Item name="quantity" label="Quantity" dependencies={["direction"]} rules={[{ validator: async (_, value) => { const stockError = stockShortage(form.getFieldValue("direction"), value, selectedItem?.CurrentBalance, selectedItem?.Unit); if (stockError) throw new Error(stockError); if (!isValidDisplayQuantity(value)) throw new Error("Enter a positive quantity with no more than two decimals"); } }]}>
-                <InputNumber id="display-quantity" className="w-full" suffix={selectedItem?.Unit ?? "Unit"} min={0.01} max={Number.MAX_SAFE_INTEGER} precision={2} step={1} prefix={<InboxOutlined />} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); operatorInput.current?.focus({ cursor: "all" }); }} />
+              <Form.Item name="quantity" label="Quantity" dependencies={["direction"]} rules={[{ validator: async (_, value) => { const stockError = stockShortage(form.getFieldValue("direction"), value, selectedItem?.CurrentBalance, selectedItem?.Unit); if (stockError) throw new Error(stockError); if (!isValidDisplayQuantity(value)) throw new Error("Enter a positive whole number"); } }]}>
+                <InputNumber id="display-quantity" className="w-full" suffix={selectedItem?.Unit ?? "Unit"} min={1} max={Number.MAX_SAFE_INTEGER} precision={0} step={1} prefix={<InboxOutlined />} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); operatorInput.current?.focus({ cursor: "all" }); }} />
               </Form.Item>
               <Form.Item name="operatorName" label="Operator Name" rules={[{ required: true, whitespace: true, message: "Enter operator name" }, { pattern: /^[\p{L}\p{N} .'-]{2,80}$/u, message: "Enter a valid operator name" }]}>
                 <Input ref={operatorInput} allowClear prefix={<UserOutlined />} suffix={<span className={styles.enterHint}>Enter to submit ↵</span>} placeholder="Type operator name" maxLength={80} disabled={!selectedItem || submitting} onPressEnter={(event) => { event.preventDefault(); form.submit(); }} />
@@ -458,7 +458,7 @@ export default function ScannerDisplay() {
                   align: "right",
                   render: (balance: string, record: DisplayItem) => (
                     <span>
-                      <strong>{balance}</strong> <small style={{ color: "#64748b" }}>{record.Unit}</small>
+                      <strong>{formatDisplayQuantity(balance)}</strong> <small style={{ color: "#64748b" }}>{record.Unit}</small>
                     </span>
                   ),
                 },
