@@ -102,9 +102,11 @@ export class InventoryItemsService {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Items', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.columns = [
-      { header: 'Name', key: 'name', width: 35 }, { header: 'Model', key: 'model', width: 18 }, { header: 'Specification', key: 'specification', width: 40 }, { header: 'Classification', key: 'classification', width: 24 }, { header: 'Unit', key: 'unit', width: 10 }, { header: 'Address Location', key: 'address', width: 22 }, { header: 'Current Balance', key: 'balance', width: 18 }, { header: 'Minimum Stock', key: 'minimum', width: 18 }, { header: 'Status', key: 'status', width: 12 },
+      { header: 'Name', key: 'name', width: 35 }, { header: 'Model', key: 'model', width: 18 }, { header: 'Specification', key: 'specification', width: 40 }, { header: 'Classification', key: 'classification', width: 24 }, { header: 'Unit', key: 'unit', width: 10 }, { header: 'Address Location', key: 'address', width: 22 }, { header: 'Actual Stock', key: 'balance', width: 18 }, { header: 'Minimum Stock', key: 'minimum', width: 18 }, { header: 'Status', key: 'status', width: 12 },
     ];
-    for (const item of rows) sheet.addRow({ name: item.Name, model: item.Model, specification: item.Specification, classification: item.Classification, unit: item.Unit, address: item.AddressLocation, balance: Number(item.CurrentBalance), minimum: Number(item.MinimumStock), status: item.IsActive ? 'Active' : 'Archived' });
+    sheet.getColumn('balance').numFmt = '0';
+    sheet.getColumn('minimum').numFmt = '0';
+    for (const item of rows) sheet.addRow({ name: item.Name, model: item.Model, specification: item.Specification, classification: item.Classification, unit: item.Unit, address: item.AddressLocation, balance: Math.round(Number(item.CurrentBalance)), minimum: Math.round(Number(item.MinimumStock)), status: item.IsActive ? 'Active' : 'Archived' });
     const output = await workbook.xlsx.writeBuffer();
     return Buffer.from(output);
   }

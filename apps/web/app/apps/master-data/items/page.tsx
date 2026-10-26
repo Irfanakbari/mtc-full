@@ -332,16 +332,16 @@ export default function ItemsPage() {
             { title: "Unit", dataIndex: "Unit" },
             { title: "Status", dataIndex: "IsActive", render: (v) => <Tag color={v ? "success" : "default"}>{v ? "Active" : "Archived"}</Tag> },
             {
-              title: "Balance",
+              title: "Actual Stock",
               dataIndex: "CurrentBalance",
               align: "right",
-              render: (v) => Number(v).toFixed(2),
+              render: (v) => Number(v).toFixed(0),
             },
             {
-              title: "Minimum",
+              title: "Minimum Stock",
               dataIndex: "MinimumStock",
               align: "right",
-              render: (v) => Number(v).toFixed(2),
+              render: (v) => Number(v).toFixed(0),
             },
             {
               title: "Stock Status",
@@ -406,7 +406,7 @@ export default function ItemsPage() {
               label="Minimum Stock"
               rules={[{ required: true, type: "number", min: 0 }]}
             >
-              <InputNumber min={0} precision={2} className="w-full" />
+              <InputNumber min={0} precision={0} step={1} className="w-full" />
             </Form.Item>
             {!selected && (
               <>
@@ -415,7 +415,7 @@ export default function ItemsPage() {
                   label="Opening Balance"
                   rules={[{ type: "number", min: 0 }]}
                 >
-                  <InputNumber min={0} precision={2} className="w-full" />
+                  <InputNumber min={0} precision={0} step={1} className="w-full" />
                 </Form.Item>
                 <Form.Item name="referenceDoc" label="Opening Reference">
                   <Input />
