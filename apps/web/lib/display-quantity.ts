@@ -2,7 +2,8 @@ export function isValidDisplayQuantity(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
-export function formatDisplayQuantity(value: string | number): string {
+export function formatDisplayQuantity(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "-";
   return Number(value).toFixed(0);
 }
 
